@@ -1,0 +1,104 @@
+# expected_crash_count: 1
+# Synthetic logcat capture: ~100 lines mixed traffic with a single embedded
+# AndroidRuntime crash sequence in the middle. Wave 1 plan 31-01 must detect
+# at least one crash (the FATAL EXCEPTION on the first crash line). Per the
+# Phase 22/31 first-detection gate (Pitfall 7), production code should only
+# fire the crash event ONCE per job even though multiple stack-trace lines
+# match. This fixture proves the parser correctly flags every crash-marker
+# line; the per-job gate lives in the streaming subscriber (31-01 Wave 1).
+12-15 10:40:00.001  3333  3333 V ActivityThread: scheduleResumeActivity
+12-15 10:40:00.005  3333  3333 D MainActivity: onResume()
+12-15 10:40:00.010  3333  3333 I ActivityManager: Start proc 3333:com.example.app/u0a123 for activity {com.example.app/.MainActivity}
+12-15 10:40:00.020  3333  3333 D MainActivity: starting render
+12-15 10:40:00.025  3333  3333 V MainActivity: bind toolbar
+12-15 10:40:00.030  3333  3333 V MainActivity: bind content
+12-15 10:40:00.035  3333  3333 D MainActivity: render complete
+12-15 10:40:00.040  3333  3333 I Telemetry: page_view emitted
+12-15 10:40:00.050  3333  3333 D MainActivity: queueing background work
+12-15 10:40:00.060  3333  3370 V Worker  : taking job 1
+12-15 10:40:00.065  3333  3370 D Worker  : running job 1
+12-15 10:40:00.075  3333  3370 I Worker  : job 1 complete
+12-15 10:40:00.080  3333  3333 D MainActivity: refreshing view
+12-15 10:40:00.085  3333  3333 V MainActivity: bind list adapter
+12-15 10:40:00.090  3333  3333 I MyApp   : initialised analytics
+12-15 10:40:00.100  3333  3333 D MainActivity: deferring expensive op
+12-15 10:40:00.110  3333  3333 V Animation: scheduling fade-in
+12-15 10:40:00.120  3333  3333 D Animation: fade-in start
+12-15 10:40:00.150  3333  3333 D Animation: fade-in end
+12-15 10:40:00.170  3333  3333 V MainActivity: scheduling scroll
+12-15 10:40:00.180  3333  3333 D MainActivity: scroll to position 5
+12-15 10:40:00.200  3333  3333 V Recycler: bind view at position 0
+12-15 10:40:00.210  3333  3333 V Recycler: bind view at position 1
+12-15 10:40:00.220  3333  3333 V Recycler: bind view at position 2
+12-15 10:40:00.230  3333  3333 V Recycler: bind view at position 3
+12-15 10:40:00.240  3333  3333 V Recycler: bind view at position 4
+12-15 10:40:00.250  3333  3333 V Recycler: bind view at position 5
+12-15 10:40:00.260  3333  3333 D MainActivity: scroll complete
+12-15 10:40:00.270  3333  3333 W Battery : low battery, throttling
+12-15 10:40:00.280  3333  3333 D MainActivity: idle
+12-15 10:40:00.290  3333  3333 V Lifecycle: visible
+12-15 10:40:00.300  3333  3370 D Worker  : taking job 2
+12-15 10:40:00.310  3333  3370 V Worker  : job 2 step 1
+12-15 10:40:00.320  3333  3370 V Worker  : job 2 step 2
+12-15 10:40:00.330  3333  3370 V Worker  : job 2 step 3
+12-15 10:40:00.340  3333  3370 I Worker  : job 2 complete
+12-15 10:40:00.350  3333  3333 D MainActivity: handling tap
+12-15 10:40:00.360  3333  3333 I Telemetry: tap emitted
+12-15 10:40:00.370  3333  3333 D MainActivity: navigating
+12-15 10:40:00.380  3333  3333 V Lifecycle: onPause hint
+12-15 10:40:00.390  3333  3333 D MainActivity: paused
+12-15 10:40:00.400  3333  3333 V Lifecycle: onStop hint
+12-15 10:40:00.410  3333  3333 D MainActivity: stopped
+12-15 10:40:00.420  3333  3333 I Telemetry: nav emitted
+12-15 10:40:00.430  3333  3333 V Detail : init
+12-15 10:40:00.440  3333  3333 D Detail : render
+12-15 10:40:00.450  3333  3333 V Detail : bind header
+12-15 10:40:00.460  3333  3333 V Detail : bind body
+12-15 10:40:00.470  3333  3333 I Detail : ready
+12-15 10:40:00.480  3333  3333 D Detail : user gesture
+12-15 10:40:00.490  3333  3333 V Detail : risky path entered
+12-15 10:40:00.500  3333  3333 E AndroidRuntime: FATAL EXCEPTION: main
+12-15 10:40:00.500  3333  3333 E AndroidRuntime: Process: com.example.app, PID: 3333
+12-15 10:40:00.500  3333  3333 E AndroidRuntime: java.lang.IllegalStateException: Cannot perform action on a destroyed activity
+12-15 10:40:00.500  3333  3333 E AndroidRuntime: 	at com.example.app.detail.DetailActivity.onUserAction(DetailActivity.java:128)
+12-15 10:40:00.500  3333  3333 E AndroidRuntime: 	at com.example.app.detail.DetailActivity$$Lambda$1.run(Unknown Source)
+12-15 10:40:00.500  3333  3333 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:938)
+12-15 10:40:00.500  3333  3333 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:99)
+12-15 10:40:00.500  3333  3333 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:223)
+12-15 10:40:00.500  3333  3333 E AndroidRuntime: 	at android.app.ActivityThread.main(ActivityThread.java:7656)
+12-15 10:40:00.500  3333  3333 E AndroidRuntime: 	at java.lang.reflect.Method.invoke(Native Method)
+12-15 10:40:00.500  3333  3333 E AndroidRuntime: 	at com.android.internal.os.RuntimeInit.main(RuntimeInit.java:592)
+12-15 10:40:00.550  3333  3333 I Process : Sending signal. PID: 3333 SIG: 9
+12-15 10:40:00.700  9876  9876 I ActivityManager: Process com.example.app (pid 3333) has died: fg  TOP
+12-15 10:40:00.710  9876  9876 W ActivityManager: Force removing ActivityRecord{c0ffee44 u0 com.example.app/.detail.DetailActivity t125}: app died, no saved state
+12-15 10:40:00.800  9876  9876 D ActivityManager: cleanup begin
+12-15 10:40:00.810  9876  9876 V ActivityManager: collecting tombstones
+12-15 10:40:00.820  9876  9876 D ActivityManager: cleanup complete
+12-15 10:40:00.900  9876  9876 I ActivityManager: scheduling restart
+12-15 10:40:01.000  4444  4444 V ActivityThread: handleBindApplication
+12-15 10:40:01.020  4444  4444 D ActivityThread: app started
+12-15 10:40:01.040  4444  4444 I MyApp   : restoring saved state
+12-15 10:40:01.060  4444  4444 D MyApp   : preferences loaded
+12-15 10:40:01.080  4444  4444 V MyApp   : feature flags fetched
+12-15 10:40:01.100  4444  4444 I MyApp   : analytics re-initialised
+12-15 10:40:01.120  4444  4444 D MainActivity: onCreate
+12-15 10:40:01.150  4444  4444 V Lifecycle: onStart
+12-15 10:40:01.180  4444  4444 D MainActivity: onResume
+12-15 10:40:01.200  4444  4444 I Telemetry: relaunch_after_crash emitted
+12-15 10:40:01.220  4444  4444 V MainActivity: render begin
+12-15 10:40:01.230  4444  4444 D MainActivity: bind toolbar
+12-15 10:40:01.240  4444  4444 V MainActivity: bind content
+12-15 10:40:01.250  4444  4444 I MainActivity: render done
+12-15 10:40:01.260  4444  4444 D MyApp   : background sync resumed
+12-15 10:40:01.280  4444  4480 V Worker  : taking restored job 1
+12-15 10:40:01.300  4444  4480 D Worker  : running restored job 1
+12-15 10:40:01.330  4444  4480 I Worker  : restored job 1 complete
+12-15 10:40:01.360  4444  4444 D MainActivity: idle after recovery
+12-15 10:40:01.400  4444  4444 V Lifecycle: visible after recovery
+12-15 10:40:01.450  4444  4444 I Telemetry: page_view after_crash
+12-15 10:40:01.500  4444  4444 D MainActivity: stable
+12-15 10:40:01.550  4444  4444 V Animation: idle
+12-15 10:40:01.600  4444  4444 D MainActivity: deferring background sync
+12-15 10:40:01.700  4444  4444 W Battery : still throttled
+12-15 10:40:01.800  4444  4444 D MainActivity: idle 2
+12-15 10:40:01.900  4444  4444 V Lifecycle: still visible

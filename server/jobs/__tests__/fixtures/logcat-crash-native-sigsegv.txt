@@ -1,0 +1,28 @@
+# expected_crash_count: 1
+# Synthetic logcat capture: a native crash via SIGSEGV (Fatal signal 11). The
+# crash-marker `Fatal signal \d+` is paired with level E DEBUG tag. Wave 1 plan
+# 31-01 must detect this as isCrash:true while ignoring the F-level libc line.
+# Note: per CONTEXT/RESEARCH, ONLY level=E lines containing crash markers are
+# crashes; the libc F-level line documents tombstone metadata but does NOT
+# satisfy the 3-of-3 gate.
+12-15 10:24:00.001  5678  5678 V MyApp   : computing native transform matrix
+12-15 10:24:00.025  5678  5678 D MyApp   : invoking JNI bridge
+12-15 10:24:00.500  5678  5678 D MyApp   : returned from JNI bridge
+12-15 10:24:01.450  5678  5678 F libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0 in tid 5678 (com.example.app)
+12-15 10:24:01.500  9999  9999 I crash_dump64: obtaining output fd from tombstoned, type: kDebuggerdTombstone
+12-15 10:24:01.700  9999  9999 I tombstoned: received crash request for pid 5678
+12-15 10:24:01.780  9999  9999 I crash_dump64: performing dump of process 5678
+12-15 10:24:01.789  9999  9999 E DEBUG   : *** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***
+12-15 10:24:01.789  9999  9999 E DEBUG   : Build fingerprint: 'google/sdk_gphone_x86/generic_x86:11/RSR1.210210.001.A1/7035366:user/release-keys'
+12-15 10:24:01.789  9999  9999 E DEBUG   : Revision: '0'
+12-15 10:24:01.789  9999  9999 E DEBUG   : ABI: 'x86'
+12-15 10:24:01.789  9999  9999 E DEBUG   : pid: 5678, tid: 5678, name: com.example.app  >>> com.example.app <<<
+12-15 10:24:01.789  9999  9999 E DEBUG   : uid: 10123
+12-15 10:24:01.789  9999  9999 E DEBUG   : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0
+12-15 10:24:01.789  9999  9999 E DEBUG   :     #00 pc 0000abcd  /system/lib/libc.so (strlen+13)
+12-15 10:24:01.789  9999  9999 E DEBUG   :     #01 pc 00012345  /data/app/com.example.app/lib/x86/libnative.so (Java_com_example_app_NativeBridge_invoke+57)
+12-15 10:24:01.789  9999  9999 E DEBUG   :     #02 pc 00067890  /apex/com.android.runtime/lib/libart.so (art_quick_generic_jni_trampoline+91)
+12-15 10:24:01.789  9999  9999 E DEBUG   : Tombstone written to: /data/tombstones/tombstone_42
+12-15 10:24:01.900  9999  9999 I tombstoned: finished crash for pid 5678
+12-15 10:24:02.050  9876  9876 I ActivityManager: Process com.example.app (pid 5678) has died: fg  TOP
+12-15 10:24:02.110  9876  9876 W ActivityManager: Force removing ActivityRecord{deadbeef u0 com.example.app/.MainActivity t124}: app died, no saved state

@@ -1,0 +1,25 @@
+# expected_crash_count: 0
+# Synthetic logcat capture: an ANR (Application Not Responding). ANR is NOT in
+# the Phase 31 initial crash-marker set (per CONTEXT). Even though level E and
+# the keyword "ANR" both appear, none of the four crash markers
+# (FATAL EXCEPTION / Fatal signal \d+ / beginning of crash / AndroidRuntime:
+# FATAL) match, so isCrash MUST be false on every line.
+12-15 10:25:28.000  1111  1111 V InputDispatcher: Window receive new input
+12-15 10:25:28.250  1111  1111 D InputDispatcher: dispatching motion event
+12-15 10:25:28.501  1111  1111 W InputDispatcher: Window 'com.example.app' has not responded to motion in 5s
+12-15 10:25:28.502  1111  1111 W InputDispatcher: dispatched events queue grows: 12 in queue
+12-15 10:25:29.000  1111  1111 W InputDispatcher: still waiting for application to respond
+12-15 10:25:29.500  1111  1111 W InputDispatcher: still waiting for application to respond
+12-15 10:25:30.123  1111  1111 E ActivityManager: ANR in com.example.app (com.example.app/.MainActivity)
+12-15 10:25:30.123  1111  1111 E ActivityManager: PID: 4567
+12-15 10:25:30.123  1111  1111 E ActivityManager: Reason: Input dispatching timed out (Waiting to send non-key event because the touched window has not finished processing certain input events that were delivered to it over 500.0ms ago.)
+12-15 10:25:30.123  1111  1111 E ActivityManager: Load: 8.32 / 7.91 / 6.05
+12-15 10:25:30.123  1111  1111 E ActivityManager: CPU usage from 0ms to 31246ms later:
+12-15 10:25:30.123  1111  1111 E ActivityManager:   98% 4567/com.example.app: 95% user + 3% kernel / faults: 1234 minor
+12-15 10:25:30.123  1111  1111 E ActivityManager:   0.6% 1111/system_server: 0.3% user + 0.3% kernel
+12-15 10:25:30.123  1111  1111 E ActivityManager:   0.1% 9876/com.android.systemui: 0.1% user + 0% kernel
+12-15 10:25:30.250  1111  1111 W ActivityManager: dumping kernel stacks: see /data/anr/traces.txt
+12-15 10:25:30.350  1111  1111 I am_anr  : [0,4567,com.example.app,945,Input dispatching timed out]
+12-15 10:25:30.500  1111  1111 D ActivityManager: showing not-responding dialog
+12-15 10:25:31.000  1111  1111 D ActivityManager: user dismissed ANR dialog -> wait
+12-15 10:25:35.000  1111  1111 I ActivityManager: process recovered from ANR

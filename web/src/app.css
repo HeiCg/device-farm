@@ -1,0 +1,128 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Light Palette (Material You inspired) ── */
+
+  /* Surfaces */
+  --color-background: #fafafa;
+  --color-surface: #ffffff;
+  --color-surface-dim: #f0f0f0;
+  --color-surface-bright: #ffffff;
+  --color-surface-variant: #ececec;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f7f7f7;
+  --color-surface-container: #f3f3f3;
+  --color-surface-container-high: #ededed;
+  --color-surface-container-highest: #e6e6e6;
+  --color-surface-tint: #6750a4;
+
+  /* On-surface */
+  --color-on-surface: #1c1b1f;
+  --color-on-surface-variant: #49454f;
+  --color-on-background: #1c1b1f;
+  --color-inverse-surface: #313033;
+  --color-inverse-on-surface: #f4eff4;
+
+  /* Primary (purple) */
+  --color-primary: #6750a4;
+  --color-primary-dim: #4f378b;
+  --color-primary-fixed: #eaddff;
+  --color-primary-fixed-dim: #d0bcff;
+  --color-primary-container: #eaddff;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #21005d;
+  --color-on-primary-fixed: #21005d;
+  --color-on-primary-fixed-variant: #4f378b;
+  --color-inverse-primary: #d0bcff;
+
+  /* Secondary (green) */
+  --color-secondary: #1f8a3b;
+  --color-secondary-dim: #176d2e;
+  --color-secondary-fixed: #b8f5c7;
+  --color-secondary-fixed-dim: #95e6ab;
+  --color-secondary-container: #d5f7df;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-fixed: #00210a;
+  --color-on-secondary-fixed-variant: #094719;
+  --color-on-secondary-container: #062a0e;
+
+  /* Tertiary (orange-red) */
+  --color-tertiary: #b3261e;
+  --color-tertiary-dim: #8c1d17;
+  --color-tertiary-fixed: #ffdad6;
+  --color-tertiary-fixed-dim: #ffb4a8;
+  --color-tertiary-container: #ffdad6;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-fixed: #410002;
+  --color-on-tertiary-fixed-variant: #690005;
+  --color-on-tertiary-container: #410002;
+
+  /* Error */
+  --color-error: #b3261e;
+  --color-error-dim: #8c1d17;
+  --color-error-container: #f9dedc;
+  --color-on-error: #ffffff;
+  --color-on-error-container: #410002;
+
+  /* Outline */
+  --color-outline: #79747e;
+  --color-outline-variant: #cac4d0;
+
+  /* ── Typography ── */
+  --font-headline: "Nunito Sans", sans-serif;
+  --font-body: "Nunito Sans", sans-serif;
+  --font-label: "Nunito Sans", sans-serif;
+
+  /* ── Border Radius ── */
+  --radius: 0.25rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--color-on-surface);
+  background: var(--color-background);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Material Symbols defaults */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Glass card utility — translucent white over light bg */
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 0.5rem;
+}
+
+/* Subtle gradient — soft purple/green wash on light bg */
+.kinetic-gradient {
+  background: radial-gradient(ellipse at top, rgba(103, 80, 164, 0.06) 0%, transparent 50%),
+              radial-gradient(ellipse at bottom right, rgba(31, 138, 59, 0.04) 0%, transparent 40%),
+              var(--color-background);
+}
+
+/* Log viewer scrollbar */
+.log-viewer::-webkit-scrollbar {
+  width: 8px;
+}
+.log-viewer::-webkit-scrollbar-track {
+  background: var(--color-surface-container);
+}
+.log-viewer::-webkit-scrollbar-thumb {
+  background: var(--color-outline-variant);
+  border-radius: 4px;
+}
+.log-viewer::-webkit-scrollbar-thumb:hover {
+  background: var(--color-outline);
+}
+
+/* Node health progress bar */
+.health-bar {
+  transition: width 0.5s ease;
+}

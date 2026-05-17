@@ -1,0 +1,59 @@
+name: Publish to GitHub Packages
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@device-stream'
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build packages
+        run: npm run build
+
+      - name: Publish @device-stream/core
+        id: publish_core
+        run: npm publish -w @device-stream/core --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish @device-stream/ios-simulator
+        if: steps.publish_core.outcome == 'success'
+        run: npm publish -w @device-stream/ios-simulator --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Publish @device-stream/ios-device
+        if: steps.publish_core.outcome == 'success'
+        run: npm publish -w @device-stream/ios-device --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Publish @device-stream/android
+        if: steps.publish_core.outcome == 'success'
+        run: npm publish -w @device-stream/android --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true

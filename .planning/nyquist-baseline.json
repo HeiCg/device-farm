@@ -1,0 +1,11 @@
+{
+  "capturedAt": "2026-04-17T15:51:04.861Z",
+  "commit": "55ff8ac202cded435987dfb7039093f1e3aea645",
+  "note": "End-of-Phase-15 substrate baseline. Phase 16+ runs `npm run nyquist:check` and must stay within -2pp of coverage.lines. Retroactive v2.0 baseline was not captured before Phase 15 source changes landed; see ADR-001 + Phase 15 retrospective.",
+  "coverage": {
+    "lines": 48.29,
+    "branches": 36,
+    "functions": 45.21,
+    "statements": 47.06
+  }
+}

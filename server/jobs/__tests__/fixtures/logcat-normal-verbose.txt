@@ -1,0 +1,54 @@
+# expected_crash_count: 0
+# Synthetic logcat capture: 50 lines of normal V/D/I/W output. No FATAL keyword,
+# no signals, no crash markers. Wave 1 plan 31-01 must classify zero lines as
+# isCrash:true here. All lines should parse successfully via the threadtime regex.
+12-15 10:30:00.001  2222  2222 V ActivityThread: scheduleResumeActivity
+12-15 10:30:00.010  2222  2222 D MainActivity: onResume()
+12-15 10:30:00.020  2222  2222 I MyApp   : starting feature_flag_sync
+12-15 10:30:00.045  2222  2222 V FeatureFlags: fetching from cache
+12-15 10:30:00.055  2222  2222 D FeatureFlags: cache hit, age=12s
+12-15 10:30:00.080  2222  2222 I MyApp   : feature_flag_sync complete (12 flags)
+12-15 10:30:00.110  2222  2240 D Network : enqueue GET /api/profile
+12-15 10:30:00.120  2222  2240 V Network : connecting to api.example.com
+12-15 10:30:00.200  2222  2240 D Network : connected (tls12, h2)
+12-15 10:30:00.205  2222  2240 V Network : sending request, headers=11
+12-15 10:30:00.350  2222  2240 D Network : response 200 OK in 145ms
+12-15 10:30:00.360  2222  2240 I MyApp   : profile loaded for user_id=abc123
+12-15 10:30:00.400  2222  2222 D MainActivity: rendering profile view
+12-15 10:30:00.450  2222  2222 V MainActivity: bind image url
+12-15 10:30:00.500  2222  2241 D ImageLoader: scheduling fetch
+12-15 10:30:00.600  2222  2241 D ImageLoader: decoded jpeg 512x512
+12-15 10:30:00.650  2222  2222 V MainActivity: image bound
+12-15 10:30:00.700  2222  2222 D MainActivity: rendering action buttons
+12-15 10:30:00.750  2222  2222 W Animation: skipping animation, reduced motion
+12-15 10:30:00.800  2222  2222 D MainActivity: action buttons ready
+12-15 10:30:01.000  2222  2222 V Lifecycle: onPause hint pending
+12-15 10:30:01.050  2222  2222 D Lifecycle: keep alive
+12-15 10:30:01.100  2222  2222 I Telemetry: emitted page_view com.example.app/.MainActivity
+12-15 10:30:01.200  2222  2242 D Database: opened db version 7
+12-15 10:30:01.220  2222  2242 V Database: BEGIN
+12-15 10:30:01.230  2222  2242 D Database: select * from sessions where active=1
+12-15 10:30:01.240  2222  2242 V Database: rows=3
+12-15 10:30:01.250  2222  2242 D Database: COMMIT
+12-15 10:30:01.260  2222  2242 I Database: cache warmed
+12-15 10:30:01.300  2222  2222 D MainActivity: scrolling rv to top
+12-15 10:30:01.400  2222  2222 V Recycler: bind view at position 0
+12-15 10:30:01.410  2222  2222 V Recycler: bind view at position 1
+12-15 10:30:01.420  2222  2222 V Recycler: bind view at position 2
+12-15 10:30:01.430  2222  2222 V Recycler: bind view at position 3
+12-15 10:30:01.500  2222  2222 D MainActivity: rv bound 4 views
+12-15 10:30:01.550  2222  2222 I Telemetry: emitted scroll_top
+12-15 10:30:01.600  2222  2222 D MainActivity: deferring background sync
+12-15 10:30:01.650  2222  2240 V Network : keep-alive ping
+12-15 10:30:01.700  2222  2240 D Network : keep-alive ack
+12-15 10:30:01.800  2222  2222 W Battery : battery saver enabled, throttling sync
+12-15 10:30:01.900  2222  2222 D MainActivity: idle
+12-15 10:30:02.000  2222  2222 V Lifecycle: visible
+12-15 10:30:02.100  2222  2222 D MainActivity: user gesture detected
+12-15 10:30:02.150  2222  2222 I Telemetry: emitted tap action_open
+12-15 10:30:02.200  2222  2222 D MainActivity: navigating to detail
+12-15 10:30:02.300  2222  2222 V Lifecycle: onPause
+12-15 10:30:02.400  2222  2222 D MainActivity: onStop
+12-15 10:30:02.500  2222  2222 I MyApp   : detail screen launched
+12-15 10:30:02.600  2222  2222 V Lifecycle: detail.onResume
+12-15 10:30:02.700  2222  2222 D Detail : rendering

@@ -1,0 +1,57 @@
+{
+  "name": "@device-stream/android",
+  "version": "1.1.0",
+  "description": "Android device streaming via TangoADB + scrcpy",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HeiCg/device-stream.git",
+    "directory": "packages/android"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit",
+    "test": "vitest run --config ../../vitest.config.ts",
+    "test:watch": "vitest --config ../../vitest.config.ts",
+    "prepublishOnly": "npm run build",
+    "postinstall": "fetch-scrcpy-server 3.3.1"
+  },
+  "keywords": [
+    "device-stream",
+    "android",
+    "scrcpy",
+    "adb",
+    "screen-mirroring",
+    "tango-adb"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@device-stream/core": "^1.1.0",
+    "@yume-chan/adb": "2.5.1",
+    "@yume-chan/adb-scrcpy": "2.3.2",
+    "@yume-chan/adb-server-node-tcp": "2.5.2",
+    "@yume-chan/fetch-scrcpy-server": "1.0.0",
+    "@yume-chan/scrcpy": "2.3.0",
+    "@yume-chan/stream-extra": "2.1.0",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/ws": "^8.5.10",
+    "typescript": "^5.3.0"
+  },
+  "peerDependencies": {
+    "ws": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,48 @@
+# Phase 37 Plan 37-03 Track C — example GHA workflow.
+#
+# The primary path is the GitHub App webhook: PRs automatically trigger
+# pipeline runs on opened/synchronize/reopened and a PR comment is
+# posted/updated by the server-side bus subscriber.
+#
+# This workflow demonstrates an alternative "manual notify" path where a
+# repository's own GitHub Actions runner pings the Device Farm server. Use
+# this when:
+#   - The repo lives outside the org where the GitHub App is installed.
+#   - You want PR builds gated on prior workflow steps (build, lint, etc.).
+#
+# Otherwise, install the Device Farm GitHub App on the repo and skip this
+# file entirely — the App handles the lifecycle.
+#
+# SECURITY: every github.event.* value is passed via `env:` (never inlined
+# into `run:`) so an attacker-controlled PR field can't inject shell.
+
+name: Device Farm PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  device-farm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Notify Device Farm
+        env:
+          DEVICE_FARM_URL: ${{ secrets.DEVICE_FARM_URL }}
+          DEVICE_FARM_WEBHOOK_SECRET: ${{ secrets.DEVICE_FARM_WEBHOOK_SECRET }}
+          DELIVERY_ID: ${{ github.event.pull_request.node_id }}
+        run: |
+          set -euo pipefail
+          # GITHUB_EVENT_PATH is provided by the runner and contains the full
+          # webhook payload — we sign the EXACT bytes (Pitfall 1 from research)
+          # rather than re-serialising via jq/echo.
+          SIGNATURE="sha256=$(openssl dgst -sha256 -hmac "${DEVICE_FARM_WEBHOOK_SECRET}" -binary < "${GITHUB_EVENT_PATH}" | xxd -p -c 256)"
+          curl -fSsL \
+            -X POST "${DEVICE_FARM_URL}/api/github/webhooks" \
+            -H "x-github-event: pull_request" \
+            -H "x-github-delivery: ${DELIVERY_ID}" \
+            -H "x-hub-signature-256: ${SIGNATURE}" \
+            -H "Content-Type: application/json" \
+            --data-binary "@${GITHUB_EVENT_PATH}"

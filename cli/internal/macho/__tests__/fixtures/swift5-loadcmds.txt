@@ -1,0 +1,66 @@
+Mach header
+      magic cputype cpusubtype  caps    filetype ncmds sizeofcmds      flags
+ 0xfeedfacf 16777228          0  0x00           2    35       3344 0x00200085
+Load command 0
+      cmd LC_SEGMENT_64
+  cmdsize 72
+  segname __PAGEZERO
+   vmaddr 0x0000000000000000
+   vmsize 0x0000000100000000
+  fileoff 0
+ filesize 0
+  maxprot 0x00000000
+ initprot 0x00000000
+   nsects 0
+    flags 0x0
+Load command 1
+      cmd LC_SEGMENT_64
+  cmdsize 712
+  segname __TEXT
+   vmaddr 0x0000000100000000
+   vmsize 0x0000000000010000
+  fileoff 0
+ filesize 65536
+  maxprot 0x00000005
+ initprot 0x00000005
+   nsects 8
+    flags 0x0
+Section
+  sectname __text
+   segname __TEXT
+      addr 0x0000000100003e60
+      size 0x0000000000001a64
+    offset 16000
+     align 2^2 (4)
+    reloff 0
+    nreloc 0
+      type S_REGULAR
+attributes PURE_INSTRUCTIONS SOME_INSTRUCTIONS
+ reserved1 0
+ reserved2 0
+Section
+  sectname __swift5_types
+   segname __TEXT
+      addr 0x0000000100008e60
+      size 0x0000000000000150
+    offset 36448
+     align 2^2 (4)
+    reloff 0
+    nreloc 0
+      type S_REGULAR
+attributes (none)
+ reserved1 0
+ reserved2 0
+Section
+  sectname __swift5_protos
+   segname __TEXT
+      addr 0x0000000100008fb0
+      size 0x0000000000000020
+    offset 36784
+     align 2^2 (4)
+    reloff 0
+    nreloc 0
+      type S_REGULAR
+attributes (none)
+ reserved1 0
+ reserved2 0

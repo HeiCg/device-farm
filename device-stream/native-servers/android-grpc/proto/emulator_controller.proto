@@ -1,0 +1,119 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// Subset port of
+// https://android.googlesource.com/platform/external/qemu/+/refs/heads/emu-master-dev/android/android-grpc/android/emulation/control/emulator_controller.proto
+// Phase 33 keeps only the RPCs Device Farm uses (4 control RPCs from upstream
+// plus an additive `getStatus` probe for the AND-GRPC-02 fallback path).
+//
+// Translated (not copied) from the upstream proto under its Apache-2.0
+// license. The RPC subset choice is documented in
+// .planning/phases/33-android-grpc/33-RESEARCH.md §Auth and §Proto subset.
+//
+// The `package` and field numbers MUST match upstream so the wire format is
+// compatible with any stock Android emulator.
+
+syntax = "proto3";
+
+package android.emulation.control;
+
+option go_package = "github.com/device-farm/device-stream/native-servers/android-grpc/proto/gen/emulatorcontrol;emulatorcontrol";
+
+import "google/protobuf/empty.proto";
+
+service EmulatorController {
+  rpc streamScreenshot(ImageFormat) returns (stream Image) {}
+  rpc sendTouch(TouchEvent) returns (google.protobuf.Empty) {}
+  rpc sendKey(KeyboardEvent) returns (google.protobuf.Empty) {}
+  rpc setClipboard(ClipData) returns (google.protobuf.Empty) {}
+  rpc getStatus(google.protobuf.Empty) returns (EmulatorStatus) {}
+}
+
+message ImageTransport {
+  enum TransportChannel {
+    TRANSPORT_CHANNEL_UNSPECIFIED = 0;
+    MMAP = 1;
+  }
+  TransportChannel channel = 1;
+  string handle = 2;
+}
+
+message ImageFormat {
+  enum ImgFormat {
+    RGB888 = 0;
+    RGBA8888 = 1;
+    PNG = 2;
+  }
+  ImgFormat format = 1;
+  int32 rotation = 2;
+  uint32 width = 3;
+  uint32 height = 4;
+  ImageTransport transport = 5;
+  uint32 display = 6;
+}
+
+message Image {
+  ImageFormat format = 1;
+  bytes image = 2;
+  uint32 width = 3;
+  uint32 height = 4;
+  uint64 seq = 5;
+  uint64 timestamp_us = 6;
+  uint32 display = 7;
+}
+
+message ClipData {
+  string text = 1;
+}
+
+message Touch {
+  enum EventExpiration {
+    EVENT_EXPIRATION_UNSPECIFIED = 0;
+    NEVER_EXPIRE = 1;
+  }
+  int32 x = 1;
+  int32 y = 2;
+  int32 identifier = 3;
+  int32 pressure = 4;
+  int32 touch_major = 5;
+  int32 touch_minor = 6;
+  int32 orientation = 7;
+  uint32 display = 8;
+  EventExpiration expiration = 9;
+}
+
+message TouchEvent {
+  repeated Touch touches = 1;
+  uint32 device = 2;
+}
+
+message KeyboardEvent {
+  enum KeyCodeType {
+    USB = 0;
+    EVDEV = 1;
+    XKB = 2;
+    WIN = 3;
+    MAC = 4;
+  }
+  enum KeyEventType {
+    keydown = 0;
+    keyup = 1;
+    keypress = 2;
+  }
+  KeyCodeType codeType = 1;
+  KeyEventType eventType = 2;
+  string key = 3;
+  string text = 4;
+  int32 keyCode = 5;
+}
+
+// Subset of upstream EmulatorStatus (AOSP proto lines 1462-1491). Wave 1 may
+// refine if protoc codegen requires more fields — Phase 33 only consumes
+// `booted` for the probe path.
+message EmulatorStatus {
+  bool booted = 1;
+  bool heart_beat = 2;
+  int64 uptime = 3;
+  map<string, string> version = 4;
+  map<string, string> hardwareConfig = 5;
+  map<string, string> bootProperties = 6;
+}

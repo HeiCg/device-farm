@@ -1,0 +1,61 @@
+node_modules/
+dist/
+*.tsbuildinfo
+recordings/
+logs/
+.svelte-kit/
+*.test-backup
+.env
+.env.*
+
+# ── GSD baseline (auto-generated) ──
+.gsd/activity/
+.gsd/runtime/
+.gsd/worktrees/
+.gsd/auto.lock
+.gsd/metrics.json
+.gsd/completed-units.json
+.gsd/STATE.md
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.code-workspace
+!.env.example
+.next/
+build/
+__pycache__/
+*.pyc
+.venv/
+venv/
+target/
+# Phase 17 vendored-source subtrees are tracked (contracts pipeline).
+# Previously this file had a blanket `vendor/` ignore from Go/PHP conventions,
+# but Phase 17 commits `vendor/device-stream/` tarballs + `vendor/sim-capture/`
+# Swift source. Any future unrelated vendor dirs should be ignored explicitly.
+# See .planning/phases/17-contracts-pipeline-ops-hygiene/17-RESEARCH.md §Recommended Directory Structure.
+*.log
+coverage/
+.cache/
+tmp/
+
+# ── GSD baseline (auto-generated) ──
+.gsd/forensics/
+.gsd/parallel/
+.gsd/gsd.db
+.gsd/DISCUSSION-MANIFEST.json
+.gsd/milestones/**/*-CONTINUE.md
+.gsd/milestones/**/continue.md
+
+# ── Native binaries (rebuilt on `npm install` via postinstall hook) ──
+device-stream/bin/android-grpc-stream
+device-stream/bin/sim-capture
+device-stream/bin/sim-capture-private
+device-stream/bin/sim-capture-avcc
+device-stream/native-servers/android-grpc/bin/
+
+# ── Ad-hoc screenshots from local smoke testing ──
+/*.png

@@ -1,0 +1,25 @@
+{
+  "name": "@device-stream/android-server",
+  "version": "1.2.0",
+  "description": "On-device TCP JSON-RPC server for Android UI automation (UiAutomator)",
+  "private": true,
+  "scripts": {
+    "build": "bash scripts/build.sh",
+    "setup": "bash scripts/setup.sh",
+    "start": "bash scripts/start.sh",
+    "clean": "cd ../../native-servers/android-device-server && ./gradlew clean"
+  },
+  "keywords": [
+    "device-stream",
+    "android",
+    "device-server",
+    "uiautomator",
+    "automation",
+    "json-rpc",
+    "tcp"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

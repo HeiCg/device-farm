@@ -1,0 +1,426 @@
+{
+  "schemas": {
+    "JobLogMessage": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "__shared#/$defs/schema0"
+        },
+        "correlationId": {
+          "$ref": "__shared#/$defs/schema1"
+        },
+        "jobId": {
+          "$ref": "__shared#/$defs/schema2"
+        },
+        "level": {
+          "$ref": "__shared#/$defs/schema3"
+        },
+        "message": {
+          "$ref": "__shared#/$defs/schema4"
+        },
+        "timestamp": {
+          "$ref": "__shared#/$defs/schema5"
+        }
+      },
+      "required": [
+        "type",
+        "correlationId",
+        "jobId",
+        "level",
+        "message",
+        "timestamp"
+      ],
+      "additionalProperties": false,
+      "id": "JobLogMessage",
+      "description": "Log line emitted by an executing job"
+    },
+    "JobStepMessage": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "__shared#/$defs/schema6"
+        },
+        "correlationId": {
+          "$ref": "__shared#/$defs/schema7"
+        },
+        "jobId": {
+          "$ref": "__shared#/$defs/schema8"
+        },
+        "stepIndex": {
+          "$ref": "__shared#/$defs/schema9"
+        },
+        "stepName": {
+          "$ref": "__shared#/$defs/schema10"
+        },
+        "status": {
+          "$ref": "__shared#/$defs/schema11"
+        }
+      },
+      "required": [
+        "type",
+        "correlationId",
+        "jobId",
+        "stepIndex",
+        "stepName",
+        "status"
+      ],
+      "additionalProperties": false,
+      "id": "JobStepMessage",
+      "description": "Test step boundary"
+    },
+    "JobStatusMessage": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "__shared#/$defs/schema12"
+        },
+        "correlationId": {
+          "$ref": "__shared#/$defs/schema13"
+        },
+        "jobId": {
+          "$ref": "__shared#/$defs/schema14"
+        },
+        "status": {
+          "$ref": "__shared#/$defs/schema15"
+        }
+      },
+      "required": [
+        "type",
+        "correlationId",
+        "jobId",
+        "status"
+      ],
+      "additionalProperties": false,
+      "id": "JobStatusMessage",
+      "description": "Job lifecycle state transition"
+    },
+    "DevicePreviewMessage": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "__shared#/$defs/schema16"
+        },
+        "correlationId": {
+          "$ref": "__shared#/$defs/schema17"
+        },
+        "deviceId": {
+          "$ref": "__shared#/$defs/schema18"
+        },
+        "frame": {
+          "$ref": "__shared#/$defs/schema19"
+        },
+        "timestamp": {
+          "$ref": "__shared#/$defs/schema20"
+        }
+      },
+      "required": [
+        "type",
+        "correlationId",
+        "deviceId",
+        "frame",
+        "timestamp"
+      ],
+      "additionalProperties": false,
+      "id": "DevicePreviewMessage",
+      "description": "Single device preview frame"
+    },
+    "DeviceStateMessage": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "__shared#/$defs/schema21"
+        },
+        "correlationId": {
+          "$ref": "__shared#/$defs/schema22"
+        },
+        "deviceId": {
+          "$ref": "__shared#/$defs/schema23"
+        },
+        "state": {
+          "$ref": "__shared#/$defs/schema24"
+        },
+        "platform": {
+          "$ref": "__shared#/$defs/schema25"
+        }
+      },
+      "required": [
+        "type",
+        "correlationId",
+        "deviceId",
+        "state",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "id": "DeviceStateMessage",
+      "description": "Device state machine transition"
+    },
+    "ArtifactCreatedMessage": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "__shared#/$defs/schema26"
+        },
+        "correlationId": {
+          "$ref": "__shared#/$defs/schema27"
+        },
+        "jobId": {
+          "$ref": "__shared#/$defs/schema28"
+        },
+        "artifactId": {
+          "$ref": "__shared#/$defs/schema29"
+        },
+        "kind": {
+          "$ref": "__shared#/$defs/schema30"
+        },
+        "sizeBytes": {
+          "$ref": "__shared#/$defs/schema31"
+        }
+      },
+      "required": [
+        "type",
+        "correlationId",
+        "jobId",
+        "artifactId",
+        "kind",
+        "sizeBytes"
+      ],
+      "additionalProperties": false,
+      "id": "ArtifactCreatedMessage",
+      "description": "New artifact persisted to storage"
+    },
+    "WsEnvelope": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "__shared#/$defs/schema32"
+        },
+        "correlationId": {
+          "$ref": "__shared#/$defs/schema33"
+        },
+        "v": {
+          "$ref": "__shared#/$defs/schema34"
+        },
+        "ts": {
+          "$ref": "__shared#/$defs/schema35"
+        },
+        "payload": {
+          "$ref": "__shared#/$defs/schema36"
+        }
+      },
+      "required": [
+        "type",
+        "correlationId",
+        "v",
+        "ts",
+        "payload"
+      ],
+      "additionalProperties": false,
+      "id": "WsEnvelope",
+      "description": "Strict envelope for every job-channel WS frame (TRACE-06). Phase 22."
+    },
+    "__shared": {
+      "$defs": {
+        "schema0": {
+          "type": "string",
+          "const": "log"
+        },
+        "schema1": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "schema2": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "schema3": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        "schema4": {
+          "type": "string"
+        },
+        "schema5": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+        },
+        "schema6": {
+          "type": "string",
+          "const": "step"
+        },
+        "schema7": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "schema8": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "schema9": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "schema10": {
+          "type": "string"
+        },
+        "schema11": {
+          "type": "string",
+          "enum": [
+            "running",
+            "passed",
+            "failed"
+          ]
+        },
+        "schema12": {
+          "type": "string",
+          "const": "status"
+        },
+        "schema13": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "schema14": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "schema15": {
+          "type": "string",
+          "enum": [
+            "queued",
+            "allocated",
+            "running",
+            "completed",
+            "failed"
+          ]
+        },
+        "schema16": {
+          "type": "string",
+          "const": "preview"
+        },
+        "schema17": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "schema18": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "schema19": {
+          "type": "string",
+          "description": "base64-encoded PNG or MP4 fragment"
+        },
+        "schema20": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+        },
+        "schema21": {
+          "type": "string",
+          "const": "device.state"
+        },
+        "schema22": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "schema23": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "schema24": {
+          "type": "string",
+          "enum": [
+            "booting",
+            "idle",
+            "allocated",
+            "running",
+            "cleanup",
+            "error",
+            "offline"
+          ]
+        },
+        "schema25": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ]
+        },
+        "schema26": {
+          "type": "string",
+          "const": "artifact.created"
+        },
+        "schema27": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "schema28": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "schema29": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "schema30": {
+          "type": "string",
+          "enum": [
+            "recording",
+            "screenshot",
+            "memory",
+            "log"
+          ]
+        },
+        "schema31": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "schema32": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema33": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "schema34": {
+          "type": "number",
+          "const": 1
+        },
+        "schema35": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+        },
+        "schema36": {}
+      }
+    }
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1776438086396,
+      "tag": "0000_add_events_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776454013533,
+      "tag": "0001_youthful_dark_beast",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776877663980,
+      "tag": "0002_bumpy_secret_warriors",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778217642656,
+      "tag": "0003_wise_aqueduct",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778219231683,
+      "tag": "0004_stiff_vampiro",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1778247627751,
+      "tag": "0005_api_keys_claims",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1778865391612,
+      "tag": "0006_pipeline_runs_azure_pr_comment",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1778871218057,
+      "tag": "0007_pipeline_enum_extensions",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1778874166726,
+      "tag": "0008_jobs_failure_class",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1778943944796,
+      "tag": "0009_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1778958684633,
+      "tag": "0010_explorations",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1778978797000,
+      "tag": "0011_phase37_analyses_preflight_github",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "name": "device-farm-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-static": "^3",
+    "@sveltejs/kit": "^2.51",
+    "@tailwindcss/vite": "^4",
+    "clsx": "^2",
+    "date-fns": "^4",
+    "svelte": "^5.53",
+    "svelte-check": "^4",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vite": "^6"
+  },
+  "dependencies": {
+    "@dagrejs/dagre": "^1.1.8",
+    "@xyflow/svelte": "^1.5.2",
+    "fuzzysort": "^3.1.0"
+  }
+}

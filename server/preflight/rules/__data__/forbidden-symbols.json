@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "rules_updated": "2026-05-17",
+  "platform": "ios",
+  "rules": [
+    {
+      "id": "ITMS-91053-USERDEFAULTS",
+      "kind": "privacy_manifest_missing_reason",
+      "severity": "blocker",
+      "trigger_symbols": [
+        "objc_msgSend$standardUserDefaults",
+        "_OBJC_CLASS_$_NSUserDefaults"
+      ],
+      "required_api_type": "NSPrivacyAccessedAPICategoryUserDefaults",
+      "required_reason_options": ["CA92.1", "AC6.1", "C56D.1"],
+      "message": "Binary uses NSUserDefaults but PrivacyInfo.xcprivacy does not declare NSPrivacyAccessedAPICategoryUserDefaults reason.",
+      "remediation": "Add NSPrivacyAccessedAPICategoryUserDefaults to NSPrivacyAccessedAPITypes in PrivacyInfo.xcprivacy with one of: CA92.1, AC6.1, C56D.1."
+    },
+    {
+      "id": "ITMS-91053-FILETIMESTAMP",
+      "kind": "privacy_manifest_missing_reason",
+      "severity": "blocker",
+      "trigger_symbols": [
+        "_NSFileCreationDate",
+        "_NSFileModificationDate",
+        "_NSURLCreationDateKey",
+        "_NSURLContentModificationDateKey"
+      ],
+      "required_api_type": "NSPrivacyAccessedAPICategoryFileTimestamp",
+      "required_reason_options": ["C617.1", "3B52.1", "0A2A.1", "DDA9.1"],
+      "message": "Binary uses File Timestamp APIs but PrivacyInfo.xcprivacy does not declare NSPrivacyAccessedAPICategoryFileTimestamp reason.",
+      "remediation": "Add NSPrivacyAccessedAPICategoryFileTimestamp to NSPrivacyAccessedAPITypes with one of: C617.1, 3B52.1, 0A2A.1, DDA9.1."
+    },
+    {
+      "id": "ITMS-91053-SYSTEMBOOTTIME",
+      "kind": "privacy_manifest_missing_reason",
+      "severity": "blocker",
+      "trigger_symbols": [
+        "_kCFAbsoluteTimeIntervalSince1970",
+        "_mach_absolute_time",
+        "_systemUptime"
+      ],
+      "required_api_type": "NSPrivacyAccessedAPICategorySystemBootTime",
+      "required_reason_options": ["35F9.1", "8FFB.1", "3D61.1"],
+      "message": "Binary uses System Boot Time APIs but PrivacyInfo.xcprivacy does not declare NSPrivacyAccessedAPICategorySystemBootTime reason.",
+      "remediation": "Add NSPrivacyAccessedAPICategorySystemBootTime to NSPrivacyAccessedAPITypes with one of: 35F9.1, 8FFB.1, 3D61.1."
+    },
+    {
+      "id": "ITMS-91053-DISKSPACE",
+      "kind": "privacy_manifest_missing_reason",
+      "severity": "blocker",
+      "trigger_symbols": [
+        "_NSURLVolumeAvailableCapacityKey",
+        "_NSURLVolumeAvailableCapacityForImportantUsageKey",
+        "_NSFileSystemFreeSize"
+      ],
+      "required_api_type": "NSPrivacyAccessedAPICategoryDiskSpace",
+      "required_reason_options": ["E174.1", "85F4.1", "7D9E.1", "B728.1"],
+      "message": "Binary uses Disk Space APIs but PrivacyInfo.xcprivacy does not declare NSPrivacyAccessedAPICategoryDiskSpace reason.",
+      "remediation": "Add NSPrivacyAccessedAPICategoryDiskSpace to NSPrivacyAccessedAPITypes with one of: E174.1, 85F4.1, 7D9E.1, B728.1."
+    },
+    {
+      "id": "ATT-MISSING-FOR-IDFA",
+      "kind": "info_plist_missing_key",
+      "severity": "blocker",
+      "trigger_symbols": [
+        "_ASIdentifierManagerAdvertisingIdentifier",
+        "_OBJC_CLASS_$_ASIdentifierManager"
+      ],
+      "required_info_plist_key": "NSUserTrackingUsageDescription",
+      "message": "Binary references ASIdentifierManager.advertisingIdentifier but Info.plist lacks NSUserTrackingUsageDescription (required since iOS 14.5).",
+      "remediation": "Add NSUserTrackingUsageDescription string entry to Info.plist explaining why your app needs tracking permission."
+    },
+    {
+      "id": "ENCRYPTION-EXPORT-MISSING",
+      "kind": "info_plist_missing_key",
+      "severity": "warning",
+      "trigger_symbols": [],
+      "always_applies": true,
+      "required_info_plist_key": "ITSAppUsesNonExemptEncryption",
+      "message": "Info.plist does not declare ITSAppUsesNonExemptEncryption; App Store Connect will prompt for export-compliance answers on every upload.",
+      "remediation": "Add ITSAppUsesNonExemptEncryption boolean to Info.plist (false for standard HTTPS/CommonCrypto usage; true requires export documentation)."
+    }
+  ]
+}

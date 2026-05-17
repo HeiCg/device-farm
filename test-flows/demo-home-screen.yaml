@@ -1,0 +1,23 @@
+appId: com.android.settings
+---
+# Demo test flow — opens Android Settings, navigates, verifies
+# Works on any API 35 emulator with stock Android
+
+- launchApp
+
+# Dismiss any crash dialogs
+- runFlow:
+    when:
+      visible: "Close app"
+    commands:
+      - tapOn: "Close app"
+
+- assertVisible: "Settings"
+
+- tapOn: "Network & internet"
+
+- assertVisible: "Internet"
+
+- back
+
+- assertVisible: "Connected devices"

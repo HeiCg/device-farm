@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>device-stream test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #111; color: #eee; padding: 20px; }
+    h1 { font-size: 1.4rem; margin-bottom: 16px; }
+    .devices { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+    .device-card {
+      background: #222; border: 1px solid #444; border-radius: 8px; padding: 12px 16px;
+      cursor: pointer; min-width: 200px; transition: border-color 0.2s;
+    }
+    .device-card:hover { border-color: #0af; }
+    .device-card.active { border-color: #0f0; }
+    .device-card .platform { font-size: 0.75rem; color: #888; text-transform: uppercase; }
+    .device-card .name { font-size: 1rem; margin: 4px 0; }
+    .device-card .serial { font-size: 0.7rem; color: #666; font-family: monospace; }
+
+    .main-area { display: flex; gap: 16px; align-items: flex-start; }
+
+    #stream-container {
+      background: #000; border-radius: 8px; overflow: hidden;
+      display: inline-block; position: relative; cursor: crosshair;
+      user-select: none; -webkit-user-select: none;
+    }
+    #stream-img { max-height: 75vh; display: block; pointer-events: none; }
+    #swipe-indicator {
+      position: absolute; pointer-events: none; display: none;
+      border: 2px solid rgba(0, 170, 255, 0.8); border-radius: 50%;
+      width: 30px; height: 30px; transform: translate(-50%, -50%);
+    }
+
+    .side-panel {
+      display: none; flex-direction: column; gap: 10px; min-width: 160px;
+    }
+    .side-panel.visible { display: flex; }
+
+    .panel-section { background: #222; border-radius: 8px; padding: 12px; }
+    .panel-section h3 { font-size: 0.8rem; color: #888; margin-bottom: 8px; text-transform: uppercase; }
+    .key-btn {
+      background: #333; border: 1px solid #555; color: #eee; padding: 8px 12px;
+      border-radius: 6px; cursor: pointer; font-size: 0.85rem; width: 100%;
+      margin-bottom: 4px; text-align: center;
+    }
+    .key-btn:hover { background: #444; border-color: #0af; }
+    .key-btn:active { background: #555; }
+
+    .text-input-row { display: flex; gap: 6px; }
+    .text-input-row input {
+      flex: 1; background: #333; border: 1px solid #555; color: #eee;
+      padding: 6px 8px; border-radius: 4px; font-size: 0.85rem;
+    }
+    .text-input-row button { flex-shrink: 0; }
+
+    #status { margin-top: 12px; font-size: 0.85rem; color: #888; }
+    #input-log { margin-top: 4px; font-size: 0.75rem; color: #555; font-family: monospace; }
+    .btn {
+      background: #333; border: 1px solid #555; color: #eee; padding: 6px 14px;
+      border-radius: 4px; cursor: pointer; font-size: 0.85rem; margin-right: 8px;
+    }
+    .btn:hover { background: #444; }
+    .controls { margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <h1>device-stream test</h1>
+  <div class="controls">
+    <button class="btn" onclick="refreshDevices()">Refresh Devices</button>
+    <button class="btn" onclick="stopStream()">Stop Stream</button>
+  </div>
+  <div class="devices" id="device-list"></div>
+
+  <div class="main-area">
+    <div id="stream-container" style="display:none">
+      <img id="stream-img" />
+      <div id="swipe-indicator"></div>
+    </div>
+
+    <div class="side-panel" id="side-panel">
+      <div class="panel-section" id="android-keys" style="display:none">
+        <h3>Android Keys</h3>
+        <button class="key-btn" onclick="sendKey('home')">Home</button>
+        <button class="key-btn" onclick="sendKey('back')">Back</button>
+        <button class="key-btn" onclick="sendKey('menu')">Recents</button>
+        <button class="key-btn" onclick="sendKey('enter')">Enter</button>
+        <button class="key-btn" onclick="sendKey('power')">Power</button>
+      </div>
+
+      <div class="panel-section" id="ios-keys" style="display:none">
+        <h3>iOS Keys</h3>
+        <button class="key-btn" onclick="sendKey('home')">Home</button>
+        <button class="key-btn" onclick="sendKey('lock')">Lock</button>
+        <button class="key-btn" onclick="sendKey('shake')">Shake</button>
+      </div>
+
+      <div class="panel-section">
+        <h3>Type Text</h3>
+        <div class="text-input-row">
+          <input type="text" id="type-input" placeholder="Type here..." />
+          <button class="key-btn" style="width:auto; padding: 6px 12px;" onclick="sendText()">Send</button>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h3>Controls</h3>
+        <p style="font-size:0.75rem; color:#666; line-height:1.4;">
+          Click on screen = Tap<br>
+          Click + drag = Swipe
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div id="status"></div>
+  <div id="input-log"></div>
+
+  <script>
+    var ws = null;
+    var frameCount = 0;
+    var fpsInterval = null;
+    var lastFpsCount = 0;
+    var currentPlatform = null;
+    var currentDeviceId = null;
+    var deviceWidth = 1080;
+    var deviceHeight = 2400;
+
+    // Swipe tracking
+    var isDragging = false;
+    var dragStartX = 0;
+    var dragStartY = 0;
+    var dragStartTime = 0;
+
+    function logInput(msg) {
+      document.getElementById('input-log').textContent = msg;
+    }
+
+    function createDeviceCard(platform, label, serial, onclick) {
+      var card = document.createElement('div');
+      card.className = 'device-card';
+      var p = document.createElement('div');
+      p.className = 'platform';
+      p.textContent = platform;
+      card.appendChild(p);
+      var n = document.createElement('div');
+      n.className = 'name';
+      n.textContent = label;
+      card.appendChild(n);
+      var s = document.createElement('div');
+      s.className = 'serial';
+      s.textContent = serial;
+      card.appendChild(s);
+      card.addEventListener('click', onclick);
+      return card;
+    }
+
+    async function refreshDevices() {
+      var container = document.getElementById('device-list');
+      container.textContent = '';
+      var res = await fetch('/api/devices');
+      var data = await res.json();
+      if (data.android.length === 0 && data.ios.length === 0) {
+        container.textContent = 'No devices found';
+        return;
+      }
+      for (var i = 0; i < data.android.length; i++) {
+        var d = data.android[i];
+        container.appendChild(
+          createDeviceCard('Android', d.model, d.serial, (function(dd) {
+            return function(e) { startStream('android', dd.serial, e.currentTarget); };
+          })(d))
+        );
+      }
+      for (var j = 0; j < data.ios.length; j++) {
+        var s = data.ios[j];
+        var iosId = s.serial || s.udid;
+        container.appendChild(
+          createDeviceCard('iOS Simulator', s.model || s.name, iosId, (function(id) {
+            return function(e) { startStream('ios', id, e.currentTarget); };
+          })(iosId))
+        );
+      }
+    }
+
+    // Convert click position on the displayed image to device coordinates.
+    // Uses deviceWidth/deviceHeight (the coordinate space the server expects)
+    // NOT img.naturalWidth (which may be scaled/retina).
+    function imgToDevice(clientX, clientY) {
+      var img = document.getElementById('stream-img');
+      var rect = img.getBoundingClientRect();
+      var relX = (clientX - rect.left) / rect.width;
+      var relY = (clientY - rect.top) / rect.height;
+      var devX = relX * deviceWidth;
+      var devY = relY * deviceHeight;
+      return { x: devX, y: devY };
+    }
+
+    // Set up touch/click handlers on stream container
+    function setupInputHandlers() {
+      var container = document.getElementById('stream-container');
+      var indicator = document.getElementById('swipe-indicator');
+
+      container.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        isDragging = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        dragStartTime = Date.now();
+        indicator.style.left = (e.clientX - container.getBoundingClientRect().left) + 'px';
+        indicator.style.top = (e.clientY - container.getBoundingClientRect().top) + 'px';
+        indicator.style.display = 'block';
+      });
+
+      document.addEventListener('mousemove', function(e) {
+        if (!isDragging) return;
+        var rect = container.getBoundingClientRect();
+        indicator.style.left = (e.clientX - rect.left) + 'px';
+        indicator.style.top = (e.clientY - rect.top) + 'px';
+      });
+
+      document.addEventListener('mouseup', function(e) {
+        if (!isDragging) return;
+        isDragging = false;
+        indicator.style.display = 'none';
+
+        var dx = e.clientX - dragStartX;
+        var dy = e.clientY - dragStartY;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        var duration = Date.now() - dragStartTime;
+
+        if (dist < 10) {
+          // It's a tap
+          var pos = imgToDevice(e.clientX, e.clientY);
+          sendTap(pos.x, pos.y);
+        } else {
+          // It's a swipe
+          var start = imgToDevice(dragStartX, dragStartY);
+          var end = imgToDevice(e.clientX, e.clientY);
+          sendSwipe(start.x, start.y, end.x, end.y, Math.max(duration, 150));
+        }
+      });
+
+      // Handle Enter key on text input
+      document.getElementById('type-input').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') sendText();
+      });
+    }
+
+    async function sendTap(x, y) {
+      if (!currentPlatform || !currentDeviceId) return;
+      var img = document.getElementById('stream-img');
+      logInput('tap (' + Math.round(x) + ', ' + Math.round(y) + ') deviceSpace=' + deviceWidth + 'x' + deviceHeight + ' imgNatural=' + img.naturalWidth + 'x' + img.naturalHeight);
+      try {
+        var resp = await fetch('/api/tap', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform: currentPlatform, deviceId: currentDeviceId, x: x, y: y }),
+        });
+        var result = await resp.json();
+        logInput('tap (' + Math.round(x) + ', ' + Math.round(y) + ') -> ' + JSON.stringify(result));
+      } catch (err) {
+        logInput('tap failed: ' + err);
+      }
+    }
+
+    async function sendSwipe(x1, y1, x2, y2, duration) {
+      if (!currentPlatform || !currentDeviceId) return;
+      logInput('swipe (' + Math.round(x1) + ',' + Math.round(y1) + ') -> (' + Math.round(x2) + ',' + Math.round(y2) + ')');
+      try {
+        await fetch('/api/swipe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform: currentPlatform, deviceId: currentDeviceId, x1: x1, y1: y1, x2: x2, y2: y2, duration: duration }),
+        });
+      } catch (err) {
+        logInput('swipe failed: ' + err);
+      }
+    }
+
+    async function sendKey(key) {
+      if (!currentPlatform || !currentDeviceId) return;
+      logInput('key: ' + key);
+      try {
+        await fetch('/api/key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform: currentPlatform, deviceId: currentDeviceId, key: key }),
+        });
+      } catch (err) {
+        logInput('key failed: ' + err);
+      }
+    }
+
+    async function sendText() {
+      var input = document.getElementById('type-input');
+      var text = input.value;
+      if (!text || !currentPlatform || !currentDeviceId) return;
+      logInput('type: "' + text + '"');
+      input.value = '';
+      try {
+        await fetch('/api/type', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platform: currentPlatform, deviceId: currentDeviceId, text: text }),
+        });
+      } catch (err) {
+        logInput('type failed: ' + err);
+      }
+    }
+
+    function startStream(platform, deviceId, cardEl) {
+      stopStream();
+      currentPlatform = platform;
+      currentDeviceId = deviceId;
+
+      document.querySelectorAll('.device-card').forEach(function(c) { c.classList.remove('active'); });
+      if (cardEl) cardEl.classList.add('active');
+
+      // Show correct key panel
+      document.getElementById('android-keys').style.display = platform === 'android' ? 'block' : 'none';
+      document.getElementById('ios-keys').style.display = platform === 'ios' ? 'block' : 'none';
+      document.getElementById('side-panel').classList.add('visible');
+
+      var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(proto + '//' + location.host + '/stream?platform=' + encodeURIComponent(platform) + '&deviceId=' + encodeURIComponent(deviceId));
+
+      frameCount = 0;
+      lastFpsCount = 0;
+      var status = document.getElementById('status');
+      var img = document.getElementById('stream-img');
+      var container = document.getElementById('stream-container');
+
+      status.textContent = 'Connecting to ' + platform + '/' + deviceId + '...';
+
+      ws.onopen = function() {
+        status.textContent = 'Connected - 0 fps - frames: 0';
+        container.style.display = 'inline-block';
+        fpsInterval = setInterval(function() {
+          var fps = frameCount - lastFpsCount;
+          lastFpsCount = frameCount;
+          status.textContent = 'Connected - ' + fps + ' fps - frames: ' + frameCount;
+        }, 1000);
+      };
+
+      ws.onmessage = function(e) {
+        var msg = JSON.parse(e.data);
+        if (msg.type === 'frame') {
+          img.src = 'data:image/jpeg;base64,' + msg.data;
+          frameCount++;
+        } else if (msg.type === 'metadata') {
+          if (msg.width) deviceWidth = msg.width;
+          if (msg.height) deviceHeight = msg.height;
+          console.log('Stream metadata:', msg);
+        } else if (msg.type === 'error') {
+          status.textContent = 'Error: ' + msg.message;
+        }
+      };
+
+      ws.onclose = function() {
+        status.textContent = 'Disconnected';
+        clearInterval(fpsInterval);
+      };
+
+      ws.onerror = function() {
+        status.textContent = 'WebSocket error';
+      };
+    }
+
+    function stopStream() {
+      if (ws) { ws.close(); ws = null; }
+      clearInterval(fpsInterval);
+      currentPlatform = null;
+      currentDeviceId = null;
+      document.getElementById('stream-container').style.display = 'none';
+      document.getElementById('side-panel').classList.remove('visible');
+      document.querySelectorAll('.device-card').forEach(function(c) { c.classList.remove('active'); });
+    }
+
+    setupInputHandlers();
+    refreshDevices();
+  </script>
+</body>
+</html>

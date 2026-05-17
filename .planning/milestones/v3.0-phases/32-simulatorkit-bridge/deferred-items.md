@@ -1,0 +1,19 @@
+# Phase 32 — Deferred Items
+
+Items pulled OUT of Phase 32 scope; logged here for future visibility. Each entry cites why it was deferred and the candidate phase that should own it.
+
+| Item | Why deferred | Next-phase candidate |
+|------|--------------|----------------------|
+| Code-signing of `sim-capture-private` daemon | Out per `32-CONTEXT.md` §Deferred. Unsigned-dev path documented in runbook §Troubleshooting (`xattr -d com.apple.quarantine`). Signing requires a Developer ID + notarization pipeline we don't yet have. | Post-canary signing phase (TBD) |
+| Multi-display support | iOS simulator is always single-display today. SimulatorKit's `SimDeviceScreenAdapter.screens` map exposes a UUID→screen lookup, but only one entry is ever populated. | If Apple ships multi-display sim (reactive) |
+| iOS 18+ / Xcode 17+ simulator API regressions | Out-of-scope for this phase. The daily Xcode-matrix CI surfaces these via the trie walker probe (`MISSING: <role>` indicates symbol drift). Each regression is reactively handled with a `kDSCriticalSymbols` prefix update in `Sources/Probe.mm`. | Reactive — open issue per regression |
+| Open Question #1 final resolution (offscreen NSWindow fallback for `activateDisplayIfNeeded`) | Resolved experimentally in Plan 32-02 — surfacesChanged callback fires without `activateDisplayIfNeeded` on tested Xcode versions. If a future Xcode breaks this, implement the offscreen NSWindow workaround (origin `-10000,-10000`, borderless, hidden) as documented in `32-RESEARCH.md` §Pitfall 5. | Reactive |
+| Probe extending beyond 8 critical symbols | Locked to 8 in Plan 32-01 per BRIEF acceptance criterion AC-2 ("8/8 symbols resolved"). Adding new symbols would silently break the gate. | Reactive if Apple adds new touch/screen APIs we need to bind to |
+| `device-farm doctor` integration | The CLI doctor command (Phase 10) checks java/adb/emulator/avdmanager/maestro/server — it does NOT probe `sim-capture-private`. A future enhancement could call `bin/sim-capture-private --probe <udid>` on darwin/arm64 and surface the result. | Phase 32+ doctor enhancement (no phase opened yet) |
+| Cross-platform x86_64 path | Apple Silicon only per `32-RESEARCH.md` §Pattern 2 (ARM64 inline-asm shims for Swift property getters). Intel Macs use the ScreenCaptureKit fallback (`sim-capture-avcc`). | N/A — Apple Silicon is the requirement |
+| Sandboxing / SIP relax for locked-down Macs | Documented in runbook §Troubleshooting (`xattr -d com.apple.quarantine`). Enterprise-managed Macs with custom Gatekeeper policies may require a signed binary or per-binary admin approval. | Reactive — paired with code-signing phase |
+| Visual-diff CI gating | `sim-visual-diff.sh` exists but is informational only (always exits 0). Gating CI on SSIM ≥ 0.995 requires a stable calibration app + decode pipeline + golden frames stored in the repo. | Future phase if visual regressions become a pattern |
+| Touch-latency CI gating | `sim-touch-latency.sh` reports median to stdout but does NOT enforce a threshold. Same reasoning as visual-diff. | Future phase |
+| Soak test in CI (1h+ duration) | `sim-soak.sh` exists with a 50 MB RSS-growth threshold but runs only on-demand. Daily 1h runs would consume too much macOS runner budget. | Weekly cron in a separate workflow (deferred phase) |
+| 8/8 symbol set extension to include orientation APIs | Orientation event sending uses a different code path (`mach_msg_send` via `lookup:error:`, per `32-RESEARCH.md` §State of the Art). If orientation control is added to the daemon, the probe set must extend. | Phase that adds orientation control (none open) |
+| Inherited carry-forward: kittyfarm `DFPrivateSimulatorChromeBridge.m` port | The secondary "chrome window" bridge from kittyfarm is not ported — only the main display bridge. We don't expose a sim chrome surface in `device-farm`. | N/A — out-of-scope by design |

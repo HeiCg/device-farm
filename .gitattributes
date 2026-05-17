@@ -1,0 +1,11 @@
+# Line-ending normalization for generated files
+*.json text eol=lf
+*.go text eol=lf
+
+# Mark generated files so GitHub diff viewer collapses them and reviewers
+# don't drown in machine-output diffs. See docs/adr/003-go-union-mapping.md
+# and RESEARCH.md §Pitfall 7.
+cli/internal/types/generated.go linguist-generated=true
+server/openapi.json linguist-generated=true
+contracts/**/*.json linguist-generated=true
+web/src/lib/api/generated-types.ts linguist-generated=true

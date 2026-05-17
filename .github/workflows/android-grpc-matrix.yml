@@ -1,0 +1,55 @@
+name: Android gRPC Matrix
+on:
+  schedule:
+    - cron: '0 9 * * *'  # 09:00 UTC daily
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [34, 35]  # newer API levels excluded: macOS Tahoe mprotect/hvf incompat (see CLAUDE.md)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.1'
+
+      - name: Install protoc + Go gRPC plugins
+        run: |
+          brew install protobuf
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+      - name: Build android-grpc daemon
+        run: bash device-stream/scripts/build-android-grpc.sh
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run smoke on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          target: google_apis_playstore
+          force-avd-creation: true
+          emulator-options: -no-audio -no-boot-anim -no-window -gpu swiftshader_indirect
+          disable-animations: true
+          script: bash device-stream/scripts/smoke-android-grpc.sh test
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-grpc-logs-api${{ matrix.api-level }}
+          path: |
+            /tmp/device-stream-android-emu-*.log
+            /tmp/smoke-android-grpc.*.log

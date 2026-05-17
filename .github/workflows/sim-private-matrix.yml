@@ -1,0 +1,43 @@
+name: sim-private-matrix
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 9 * * *'   # 09:00 UTC daily
+
+jobs:
+  smoke:
+    runs-on: macos-14   # Apple Silicon
+    strategy:
+      fail-fast: false
+      matrix:
+        xcode: ["15.4", "16.0", "16.1", "17.0"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        env:
+          XCODE_VERSION: ${{ matrix.xcode }}
+        run: sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app/Contents/Developer" || echo "Xcode ${XCODE_VERSION} not installed on runner — soft-skip"
+      - name: Install xcodegen
+        run: brew install xcodegen
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm ci
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build sim-capture-private
+        run: bash device-stream/scripts/build-sim-capture-private.sh
+      - name: Boot iOS simulator
+        run: |
+          UDID=$(xcrun simctl create "smoke-${{ matrix.xcode }}" "iPhone 15" || true)
+          if [[ -z "$UDID" ]]; then
+            UDID=$(xcrun simctl list devices available | grep -m1 "iPhone" | grep -oE '[A-F0-9-]{36}')
+          fi
+          echo "SMOKE_UDID=$UDID" >> $GITHUB_ENV
+          xcrun simctl boot "$UDID" || true
+      - name: Smoke
+        run: bash device-stream/scripts/smoke-sim-private.sh "$SMOKE_UDID"
+        if: ${{ always() }}

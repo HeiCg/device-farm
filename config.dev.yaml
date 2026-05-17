@@ -1,0 +1,48 @@
+# Development config — disables Android/iOS pools so the server starts
+# without emulator/simulator dependencies.
+#
+# Usage: DEVICE_FARM_CONFIG=config.dev.yaml npm run dev
+
+server:
+  port: 3000
+  host: "0.0.0.0"
+
+pool:
+  max_devices: 1
+  android:
+    enabled: false
+    max_instances: 0
+    headless: true
+    api_level: 34
+    device_profile: "pixel_7"
+    ram_mb: 2048
+  ios:
+    enabled: false
+    max_instances: 0
+    runtime: "iOS-17-5"
+    device_type: "iPhone-15"
+
+storage:
+  artifacts:
+    path: "./storage/artifacts"
+    retention_days: 30
+    compress_after_days: 7
+    format: "mp4"
+    max_storage_gb: 50
+  logs:
+    retention_days: 90
+    path: "./storage/logs"
+
+jobs:
+  timeout_minutes: 30
+  max_queue_size: 100
+  cleanup_completed_after_days: 7
+
+job_metadata_schema:
+  required: []
+  optional:
+    - name: "branch"
+      type: "string"
+
+auth:
+  enabled: false

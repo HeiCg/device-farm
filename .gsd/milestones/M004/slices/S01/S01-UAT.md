@@ -1,0 +1,6 @@
+# S01: Schema + Labels CRUD — UAT
+
+**Milestone:** M004
+**Written:** 2026-03-26T19:52:40.205Z
+
+## UAT: S01 — Schema + Labels CRUD\n\n### Prerequisites\n- Server running with PostgreSQL\n- Web app accessible\n\n### Test 1: Database Tables\n1. Run `npx drizzle-kit push` against the database\n2. Verify all 9 new tables exist: labels, test_cases, test_case_steps, test_case_labels, test_suites, test_suite_cases, test_executions, test_execution_results, test_step_results\n3. Verify indexes exist on FK columns\n\n### Test 2: Labels API\n1. `POST /api/labels` with `{\"name\": \"login\", \"color\": \"#00fd93\", \"category\": \"feature\"}` → 201\n2. `POST /api/labels` with same name → 409 Conflict\n3. `GET /api/labels` → list includes created label\n4. `GET /api/labels?category=feature` → filtered list\n5. `PUT /api/labels/:id` with `{\"color\": \"#ff0000\"}` → updated\n6. `DELETE /api/labels/:id` → deleted\n\n### Test 3: Labels UI\n1. Navigate to Settings page\n2. Scroll to LABELS section\n3. Click NEW_LABEL\n4. Fill name, pick color, select category\n5. Create → pill appears grouped under category\n6. Hover pill → edit/delete buttons appear\n7. Click delete → two-click confirmation\n8. Edit → form pre-fills, update works

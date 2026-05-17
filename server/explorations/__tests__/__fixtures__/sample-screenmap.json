@@ -1,0 +1,196 @@
+{
+  "run": {
+    "id": "11111111-1111-4111-8111-111111111111",
+    "deviceId": "22222222-2222-4222-8222-222222222222",
+    "sessionId": "33333333-3333-4333-8333-333333333333",
+    "appArtifactId": "44444444-4444-4444-8444-444444444444",
+    "bundleId": "com.example.shop",
+    "platform": "android",
+    "status": "complete",
+    "startScreenId": "home",
+    "budgetTaps": 200,
+    "budgetScreens": 60,
+    "budgetSeconds": 1800,
+    "config": {},
+    "stats": null,
+    "ownerApiKeyId": null,
+    "ownerActor": "system",
+    "createdAt": "2026-05-16T20:00:00.000Z",
+    "startedAt": "2026-05-16T20:00:10.000Z",
+    "finishedAt": "2026-05-16T20:05:00.000Z",
+    "errorMessage": null
+  },
+  "screens": [
+    {
+      "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01",
+      "runId": "11111111-1111-4111-8111-111111111111",
+      "screenId": "home",
+      "title": "Shop Home",
+      "screenshotArtifactId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb01",
+      "phash": null,
+      "elements": [
+        {
+          "label": "Shop tab",
+          "element_type": "tab",
+          "explored": true,
+          "leads_to": "shop"
+        },
+        {
+          "label": "Settings tab",
+          "element_type": "tab",
+          "explored": false
+        }
+      ],
+      "notes": null,
+      "bfsDepth": 0,
+      "visitedAt": "2026-05-16T20:00:15.000Z"
+    },
+    {
+      "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa02",
+      "runId": "11111111-1111-4111-8111-111111111111",
+      "screenId": "shop",
+      "title": "Shop",
+      "screenshotArtifactId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb02",
+      "phash": null,
+      "elements": [
+        {
+          "label": "Product card",
+          "element_type": "list_item",
+          "explored": true,
+          "leads_to": "product"
+        }
+      ],
+      "notes": null,
+      "bfsDepth": 1,
+      "visitedAt": "2026-05-16T20:00:30.000Z"
+    },
+    {
+      "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa03",
+      "runId": "11111111-1111-4111-8111-111111111111",
+      "screenId": "product",
+      "title": "Product Detail",
+      "screenshotArtifactId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb03",
+      "phash": null,
+      "elements": [
+        {
+          "label": "Add to cart",
+          "element_type": "button",
+          "explored": true,
+          "leads_to": "cart"
+        }
+      ],
+      "notes": null,
+      "bfsDepth": 2,
+      "visitedAt": "2026-05-16T20:01:00.000Z"
+    },
+    {
+      "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa04",
+      "runId": "11111111-1111-4111-8111-111111111111",
+      "screenId": "cart",
+      "title": "Your Cart",
+      "screenshotArtifactId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb04",
+      "phash": null,
+      "elements": [
+        {
+          "label": "Checkout",
+          "element_type": "button",
+          "explored": false
+        }
+      ],
+      "notes": "Demo cart never persists",
+      "bfsDepth": 3,
+      "visitedAt": "2026-05-16T20:01:30.000Z"
+    },
+    {
+      "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa05",
+      "runId": "11111111-1111-4111-8111-111111111111",
+      "screenId": "settings",
+      "title": "Settings",
+      "screenshotArtifactId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb05",
+      "phash": null,
+      "elements": [],
+      "notes": null,
+      "bfsDepth": 1,
+      "visitedAt": "2026-05-16T20:02:00.000Z"
+    }
+  ],
+  "transitions": [
+    {
+      "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc01",
+      "runId": "11111111-1111-4111-8111-111111111111",
+      "fromScreenId": "home",
+      "toScreenId": "shop",
+      "action": { "kind": "tap", "target": "Shop tab" },
+      "actionHash": "h1",
+      "isBackEdge": false,
+      "bfsOrder": 1,
+      "createdAt": "2026-05-16T20:00:20.000Z"
+    },
+    {
+      "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc02",
+      "runId": "11111111-1111-4111-8111-111111111111",
+      "fromScreenId": "shop",
+      "toScreenId": "product",
+      "action": { "kind": "tap", "target": "Product card" },
+      "actionHash": "h2",
+      "isBackEdge": false,
+      "bfsOrder": 2,
+      "createdAt": "2026-05-16T20:00:45.000Z"
+    },
+    {
+      "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc03",
+      "runId": "11111111-1111-4111-8111-111111111111",
+      "fromScreenId": "product",
+      "toScreenId": "cart",
+      "action": { "kind": "tap", "target": "Add to cart" },
+      "actionHash": "h3",
+      "isBackEdge": false,
+      "bfsOrder": 3,
+      "createdAt": "2026-05-16T20:01:15.000Z"
+    },
+    {
+      "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc04",
+      "runId": "11111111-1111-4111-8111-111111111111",
+      "fromScreenId": "home",
+      "toScreenId": "settings",
+      "action": { "kind": "tap", "target": "Settings tab" },
+      "actionHash": "h4",
+      "isBackEdge": false,
+      "bfsOrder": 4,
+      "createdAt": "2026-05-16T20:01:45.000Z"
+    },
+    {
+      "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc05",
+      "runId": "11111111-1111-4111-8111-111111111111",
+      "fromScreenId": "cart",
+      "toScreenId": "home",
+      "action": { "kind": "key", "code": "back" },
+      "actionHash": "h5",
+      "isBackEdge": true,
+      "bfsOrder": 5,
+      "createdAt": "2026-05-16T20:02:15.000Z"
+    },
+    {
+      "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc06",
+      "runId": "11111111-1111-4111-8111-111111111111",
+      "fromScreenId": "settings",
+      "toScreenId": "home",
+      "action": { "kind": "key", "code": "back" },
+      "actionHash": "h6",
+      "isBackEdge": true,
+      "bfsOrder": 6,
+      "createdAt": "2026-05-16T20:02:30.000Z"
+    },
+    {
+      "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc07",
+      "runId": "11111111-1111-4111-8111-111111111111",
+      "fromScreenId": "product",
+      "toScreenId": "shop",
+      "action": { "kind": "key", "code": "back" },
+      "actionHash": "h7",
+      "isBackEdge": true,
+      "bfsOrder": 7,
+      "createdAt": "2026-05-16T20:02:45.000Z"
+    }
+  ]
+}

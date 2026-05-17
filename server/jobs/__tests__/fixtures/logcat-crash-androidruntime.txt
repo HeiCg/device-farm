@@ -1,0 +1,36 @@
+# expected_crash_count: 1
+# Synthetic logcat capture: a single AndroidRuntime FATAL EXCEPTION sequence
+# embedded in normal verbose/debug/info chatter. Wave 1 plan 31-01 must classify
+# the AndroidRuntime FATAL EXCEPTION line as isCrash:true and ignore everything
+# else.
+12-15 10:23:40.001  1234  1234 V ActivityThread: handleResumeActivity for com.example.app/.MainActivity
+12-15 10:23:40.002  1234  1234 D MainActivity: onResume()
+12-15 10:23:40.005  1234  1234 I ActivityManager: Start proc 5678:com.example.app/u0a123 for activity {com.example.app/.MainActivity}
+12-15 10:23:40.103  1234  1234 D MainActivity: scheduling background sync
+12-15 10:23:40.108  1234  1234 I MyApp   : initialised network client
+12-15 10:23:40.115  1234  1300 D Choreographer: Skipped 4 frames!  The application may be doing too much work on its main thread.
+12-15 10:23:40.221  1234  1234 W MyApp   : sync retried (attempt 1/3)
+12-15 10:23:40.350  1234  1234 V MyApp   : received payload size=4096
+12-15 10:23:40.401  1234  1234 D MyApp   : parsing payload
+12-15 10:23:40.450  1234  1234 I MyApp   : updated cache
+12-15 10:23:41.001  1234  1234 V ActivityThread: scheduleLaunchActivity
+12-15 10:23:41.110  1234  1234 D MainActivity: onPause()
+12-15 10:23:41.120  1234  1234 D MainActivity: onStop()
+12-15 10:23:42.220  1234  1234 W InputDispatcher: channel 'com.example.app' ~ stalled
+12-15 10:23:42.301  1234  1234 I MyApp   : background sync starting
+12-15 10:23:42.450  1234  1234 D MyApp   : entering risky code path
+12-15 10:23:42.451  1234  1234 E AndroidRuntime: FATAL EXCEPTION: main
+12-15 10:23:42.451  1234  1234 E AndroidRuntime: Process: com.example.app, PID: 1234
+12-15 10:23:42.451  1234  1234 E AndroidRuntime: java.lang.NullPointerException: Attempt to invoke virtual method 'java.lang.String com.example.app.User.getName()' on a null object reference
+12-15 10:23:42.451  1234  1234 E AndroidRuntime: 	at com.example.app.MainActivity.onCreate(MainActivity.java:42)
+12-15 10:23:42.451  1234  1234 E AndroidRuntime: 	at android.app.Activity.performCreate(Activity.java:8054)
+12-15 10:23:42.451  1234  1234 E AndroidRuntime: 	at android.app.Activity.performCreate(Activity.java:8034)
+12-15 10:23:42.451  1234  1234 E AndroidRuntime: 	at android.app.Instrumentation.callActivityOnCreate(Instrumentation.java:1346)
+12-15 10:23:42.451  1234  1234 E AndroidRuntime: 	at android.app.ActivityThread.performLaunchActivity(ActivityThread.java:3601)
+12-15 10:23:42.451  1234  1234 E AndroidRuntime: 	at android.app.ActivityThread.handleLaunchActivity(ActivityThread.java:3776)
+12-15 10:23:42.501  1234  1234 I Process : Sending signal. PID: 1234 SIG: 9
+12-15 10:23:42.700  9876  9876 I ActivityManager: Process com.example.app (pid 1234) has died: fg  TOP
+12-15 10:23:42.710  9876  9876 W ActivityManager: Force removing ActivityRecord{abcd1234 u0 com.example.app/.MainActivity t123}: app died, no saved state
+12-15 10:23:42.900  9876  9876 D ActivityManager: cleaning up token for com.example.app
+12-15 10:23:43.011  9876  9876 V ActivityManager: scheduling restart
+12-15 10:23:43.150  9876  9876 D ActivityManager: postCrash cleanup complete

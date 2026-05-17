@@ -1,0 +1,118 @@
+name: sim-capture-private
+options:
+  bundleIdPrefix: com.devicestream
+  deploymentTarget:
+    macOS: "13.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    ARCHS: arm64
+    ONLY_ACTIVE_ARCH: YES
+    CLANG_CXX_LANGUAGE_STANDARD: "c++17"
+    CLANG_ENABLE_OBJC_ARC: YES
+    GCC_PREPROCESSOR_DEFINITIONS:
+      - $(inherited)
+      - SIM_PRIVATE_BUILD=1
+    FRAMEWORK_SEARCH_PATHS:
+      - $(inherited)
+      - /Library/Developer/PrivateFrameworks
+      - $(DEVELOPER_DIR)/Library/PrivateFrameworks
+    OTHER_LDFLAGS:
+      - -Xlinker
+      - -rpath
+      - -Xlinker
+      - /Library/Developer/PrivateFrameworks
+      - -Xlinker
+      - -rpath
+      - -Xlinker
+      - $(DEVELOPER_DIR)/Library/PrivateFrameworks
+
+targets:
+  sim-capture-private:
+    type: tool
+    platform: macOS
+    sources:
+      - path: Sources
+    settings:
+      base:
+        PRODUCT_NAME: sim-capture-private
+    dependencies:
+      - sdk: VideoToolbox.framework
+      - sdk: CoreVideo.framework
+      - sdk: CoreMedia.framework
+      - sdk: CoreGraphics.framework
+      - sdk: IOSurface.framework
+      - sdk: Foundation.framework
+      - sdk: AppKit.framework
+      - framework: SimulatorKit.framework
+        embed: false
+        weak: true
+      - framework: CoreSimulator.framework
+        embed: false
+        weak: true
+
+  Tests:
+    # Standalone XCTest bundle: recompiles the same Sources files as the
+    # daemon (no TEST_HOST / BUNDLE_LOADER — tool-style hosts aren't valid
+    # bundle.unit-test hosts).  The XCTest runner loads this bundle into
+    # `xctest`'s own process which suffices for symbol-resolution unit tests.
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+      - path: Sources/DyldSymbols.mm
+      - path: Sources/DyldSymbols.h
+      - path: Sources/Bridge.mm
+      - path: Sources/Bridge.h
+      - path: Sources/ScreenAttach.mm
+      - path: Sources/ScreenAttach.h
+      - path: Sources/TouchInject.mm
+      - path: Sources/TouchInject.h
+      - path: Sources/H264Encoder.mm
+      - path: Sources/H264Encoder.h
+      - path: Sources/IpcServer.mm
+      - path: Sources/IpcServer.h
+    dependencies:
+      - sdk: Foundation.framework
+      - sdk: AppKit.framework
+      - sdk: CoreVideo.framework
+      - sdk: CoreGraphics.framework
+      - sdk: CoreMedia.framework
+      - sdk: VideoToolbox.framework
+      - sdk: IOSurface.framework
+      - framework: SimulatorKit.framework
+        embed: false
+        weak: true
+      - framework: CoreSimulator.framework
+        embed: false
+        weak: true
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        HEADER_SEARCH_PATHS:
+          - $(inherited)
+          - $(SRCROOT)/Sources
+        GCC_PREPROCESSOR_DEFINITIONS:
+          - $(inherited)
+          - SIM_PRIVATE_BUILD=1
+          - SIM_PRIVATE_TESTING=1
+
+schemes:
+  sim-capture-private:
+    build:
+      targets:
+        sim-capture-private: all
+        Tests: [test]
+    test:
+      targets:
+        - Tests
+      gatherCoverageData: false
+  Tests:
+    build:
+      targets:
+        sim-capture-private: all
+        Tests: [test]
+    test:
+      targets:
+        - Tests
+      gatherCoverageData: false

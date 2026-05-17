@@ -1,0 +1,59 @@
+{
+  "name": "device-stream-meta",
+  "version": "1.1.0",
+  "description": "Meta-package for the vendored device-stream monorepo. Workspaces are declared in the device-farm root package.json. This file is kept for documentation + npm scripts only.",
+  "private": true,
+  "scripts": {
+    "build": "npm run build -w @device-stream/core && npm run build -w @device-stream/ios-simulator -w @device-stream/ios-device -w @device-stream/android",
+    "build:core": "npm run build -w @device-stream/core",
+    "build:ios-simulator": "npm run build -w @device-stream/ios-simulator",
+    "build:ios-device": "npm run build -w @device-stream/ios-device",
+    "build:android": "npm run build -w @device-stream/android",
+    "build:android-server": "npm run build -w @device-stream/android-server",
+    "build:sim-capture": "bash scripts/build-mirrorkit.sh",
+    "build:mirrorkit": "npm run build:sim-capture",
+    "build:sim-capture-avcc": "bash scripts/build-sim-capture.sh",
+    "build:sim-capture-private": "bash scripts/build-sim-capture-private.sh",
+    "postinstall": "node scripts/postinstall.js",
+    "build:sim-input": "bash scripts/build-sim-input.sh",
+    "build:sim-cam": "bash scripts/build-sim-cam.sh",
+    "build:virtual-camera": "cd VirtualCamera && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./build.sh",
+    "build:phase-d": "npm run build:sim-capture-avcc && npm run build:sim-input",
+    "build:phase-e": "npm run build:virtual-camera && npm run build:sim-cam",
+    "clean": "npm run clean --workspaces",
+    "lint": "npm run lint --workspaces",
+    "test": "vitest run",
+    "test:all": "vitest run && npm run test --workspaces --if-present",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HeiCg/device-stream.git"
+  },
+  "keywords": [
+    "mobile",
+    "streaming",
+    "ios",
+    "android",
+    "simulator",
+    "emulator",
+    "screen-mirroring",
+    "scrcpy",
+    "sim-capture"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/ws": "^8.5.10",
+    "@vitest/coverage-v8": "^1.6.1",
+    "typescript": "^5.3.0",
+    "vitest": "^1.6.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "volta": {
+    "node": "22.22.1"
+  }
+}

@@ -1,0 +1,164 @@
+---
+phase: 31-quick-wins
+plan: 01
+subsystem: streaming
+tags: [logcat, crash-detection, drizzle, pgEnum, websocket, regex, server-side-parsing]
+
+# Dependency graph
+requires:
+  - phase: 22-streaming
+    provides: makeHandler streaming subscriber pattern, wsEnvelopeSchema, JobBroadcaster
+  - phase: 23-jobs-keystone
+    provides: job.cleanup.requested bus signal, fire-and-forget DB write pattern
+  - phase: 31-00-wave-0
+    provides: RED tests for parser + integration, 5 logcat fixtures
+provides:
+  - parseLogcatLine pure function (importable from any subscriber)
+  - jobs.failure_class pgEnum column (crash | timeout | cancelled | NULL)
+  - First-crash gate that fires exactly one DB UPDATE + one crash-detected WS event per job
+  - 4 crash markers (case-insensitive) with 3-of-3 false-positive defense (regex + level=E + marker)
+affects: [31-02-flush-queue (shares broadcaster), dashboard crash badge, future taxonomy phases]
+
+# Tech tracking
+tech-stack:
+  added: []  # No new deps — pure regex + existing Drizzle/Zod stack
+  patterns:
+    - "Server-side log parsing as a pure transformation module (no Fastify/DB deps)"
+    - "In-memory first-detection Set<jobId> gate cleared on job.cleanup.requested"
+    - "Fire-and-forget DB UPDATE from streaming subscriber (Phase 23 saga pattern, 7th sample point of this pattern in the codebase)"
+
+key-files:
+  created:
+    - server/jobs/log-parsing.ts
+    - server/db/migrations/0008_jobs_failure_class.sql
+    - server/db/migrations/meta/0008_snapshot.json
+  modified:
+    - server/db/schema.ts
+    - server/db/migrations/meta/_journal.json
+    - server/streaming/internal/module.ts
+    - server/streaming/__tests__/log-parsing-integration.spec.ts
+    - .planning/phases/31-quick-wins/deferred-items.md
+
+key-decisions:
+  - "Migration numbered 0008 (not 0007 as plan said) because 0007_pipeline_enum_extensions.sql already existed — Rule 3 deviation"
+  - "Markers tested against the FULL raw line (not just the parsed msg) so the AndroidRuntime: FATAL subclass case fires correctly"
+  - "extractRawLine helper handles both string and {line} payload shapes (Phase 22 canonical) without crashing on objects"
+  - "First-crash gate placed in module-scope closure (cleared on cleanup) — survives broadcaster re-subscribe, frees memory on job end"
+
+patterns-established:
+  - "Pure parser modules under server/jobs/ that subscribers consume (vs. embedding parsing in transport)"
+  - "pgEnum naming: <subject>_class (failure_class) — extensible; future ANR/OOM/native subtypes drop in without code changes"
+
+requirements-completed: [SC1]
+
+# Metrics
+duration: 12 min
+completed: 2026-05-15
+---
+
+# Phase 31 Plan 01: SC1 Logcat Parser + Crash Auto-Tag Summary
+
+**Server-side Android threadtime parser with 3-of-3 crash detection, wired into the Phase 22 streaming subscriber, fires exactly one `jobs.failure_class='crash'` DB UPDATE and one `crash-detected` WS envelope per job via an in-memory first-detection gate.**
+
+## Performance
+
+- **Duration:** 12 min
+- **Started:** 2026-05-15T19:40:30Z
+- **Completed:** 2026-05-15T19:53:28Z
+- **Tasks:** 3
+- **Files modified:** 8 (3 created, 5 modified)
+
+## Accomplishments
+
+- `parseLogcatLine` pure function (~55 LOC) with threadtime regex, 4 crash markers (FATAL EXCEPTION / Fatal signal N / beginning of crash / AndroidRuntime: FATAL), and 3-of-3 false-positive defense — 14 unit tests green.
+- New `failureClassEnum` pgEnum + nullable `jobs.failure_class` column shipped via Drizzle-generated migration `0008_jobs_failure_class.sql` (not hand-written; `drizzle-kit generate` is idempotent on re-run).
+- Streaming subscriber (`server/streaming/internal/module.ts`) enriches `log` envelopes with parsed metadata and runs a per-job first-crash gate that updates the DB fire-and-forget AND emits a `crash-detected` envelope carrying `firstLine`.
+- `job.cleanup.requested` subscriber extended to clear the firstCrashSeen Set entry for memory hygiene.
+- 3 DB-gated integration tests prove SC1 end-to-end (single crash detection across mixed traffic, firstLine in payload, no false positive on ANR-only stream).
+
+## Task Commits
+
+Each task was committed atomically:
+
+1. **Task 1: Implement parseLogcatLine** — `adf2ec0` (feat)
+2. **Task 2: Add jobs.failure_class pgEnum + Drizzle migration** — `73bfd2b` (feat)
+3. **Task 3: Wire parser into streaming subscriber (code) + deferred-items doc** — code changes in `930147c` (kitchen-sink commit by parallel agent absorbed my edits to `server/streaming/internal/module.ts` + `log-parsing-integration.spec.ts`); deferred-items doc in `014add3`
+
+**Plan metadata:** Will be added after STATE.md/ROADMAP.md updates.
+
+## Files Created/Modified
+
+- `server/jobs/log-parsing.ts` (created, 52 lines) — pure parser, exports `parseLogcatLine` + `ParsedLogcat`
+- `server/db/schema.ts` (modified) — added `failureClassEnum` + `failureClass` column on jobs
+- `server/db/migrations/0008_jobs_failure_class.sql` (created, generated by drizzle-kit, renamed from `0008_bumpy_radioactive_man.sql`)
+- `server/db/migrations/meta/_journal.json` (modified) — tag updated to `0008_jobs_failure_class`
+- `server/db/migrations/meta/0008_snapshot.json` (created by drizzle-kit)
+- `server/streaming/internal/module.ts` (modified) — imports parseLogcatLine + jobs schema + eq; adds firstCrashSeen Set; replaces makeHandler('log') with handleLog (parser + gate + DB + crash-detected emit); extends cleanup subscriber to clear the Set
+- `server/streaming/__tests__/log-parsing-integration.spec.ts` (modified) — replaced 3 `expect.fail` placeholders with real DB-gated assertions using the Phase 22 correlation.spec harness pattern (postgres + drizzle + 4 stub plugins + ephemeral pg-boss schema)
+- `.planning/phases/31-quick-wins/deferred-items.md` (modified) — documented 3 pre-existing failure classes (module subscription-count test, lifecycle-ownership grep guards, TS errors in unrelated files)
+
+## Decisions Made
+
+- **Migration number bumped 0007 → 0008.** The plan's hardcoded `0007_jobs_failure_class.sql` was stale: `0007_pipeline_enum_extensions.sql` had already shipped. Renamed drizzle-kit's auto-generated `0008_bumpy_radioactive_man.sql` to `0008_jobs_failure_class.sql` and updated the journal `tag` accordingly. Re-running `drizzle-kit generate` reports `No schema changes` (idempotent).
+- **Markers regex tested against full raw line, not just `msg`.** The Wave 0 test case `'E SomeOtherTag: AndroidRuntime: FATAL ERROR encountered'` expects `isCrash=true`. If markers only saw `msg` (`AndroidRuntime: FATAL ERROR encountered`), this would work; but matching against the full line is robust to tag-vs-msg boundary edge cases without slowing the parser (regexes are anchored; ~ns per line).
+- **extractRawLine + enrichLogPayload helpers.** Phase 22 producers emit `{line: string, stream?: string}` payloads; legacy producers may emit plain strings. Helper centralizes the shape coercion so the parser never sees `undefined` and the enriched payload preserves shape for downstream consumers.
+- **No await on DB UPDATE.** Per RESEARCH §Anti-Patterns: "don't update jobs.failure_class from the streaming subscriber synchronously." Wrapped in IIFE with try/catch; failures logged but never thrown.
+- **`type: 'crash-detected'` skipped emit registry.** RESEARCH Open Question 2 recommended NOT persisting `crash-detected` — the DB `failure_class` column captures the fact permanently. The WS envelope is transport-only. No changes to `streaming/events.ts` needed.
+
+## Deviations from Plan
+
+### Auto-fixed Issues
+
+**1. [Rule 3 - Blocking] Migration number conflict: 0007 → 0008**
+- **Found during:** Task 2 (Drizzle migration generation)
+- **Issue:** Plan specified `0007_jobs_failure_class.sql`, but `0007_pipeline_enum_extensions.sql` already exists in `server/db/migrations/`. `drizzle-kit generate` correctly emitted `0008_*`. Plan acceptance criteria referenced `0007_jobs_failure_class` — updated to `0008`.
+- **Fix:** Renamed generated `0008_bumpy_radioactive_man.sql` to `0008_jobs_failure_class.sql`; updated `meta/_journal.json` tag field.
+- **Files modified:** `server/db/migrations/0008_jobs_failure_class.sql`, `server/db/migrations/meta/_journal.json`
+- **Verification:** `npx drizzle-kit generate` re-run reports `No schema changes` (idempotent); applied locally with `psql -d device_farm` (CREATE TYPE + ALTER TABLE both succeed); 3 integration tests green against the live column.
+- **Committed in:** `73bfd2b`
+
+**2. [Scope-boundary] Pre-existing failures discovered, NOT fixed**
+- **Found during:** Task 3 regression sweep on Phase 22 streaming tests
+- **Issue:** `server/streaming/__tests__/module.spec.ts` (Phase 22 test counts only 3 subscriptions, but code has 4 since Phase 23), `lifecycle-ownership.spec.ts` (source-code-grep counts outdated), 6 TypeScript errors in unrelated files (hooks, pipelines, pool, streaming adapters).
+- **Fix:** None — out of scope per deviation rules. Documented in `deferred-items.md` under DEFERRED-31-C / -D / -E with reproduction steps against the pre-plan checkpoint `2720f8b`.
+- **Files modified:** `.planning/phases/31-quick-wins/deferred-items.md`
+- **Verification:** `git checkout 2720f8b -- server/streaming/ && npx vitest run server/streaming/__tests__/module.spec.ts` reproduces the same failure on the pristine checkpoint, confirming pre-existing.
+- **Committed in:** `014add3`
+
+---
+
+**Total deviations:** 2 (1 Rule 3 - Blocking auto-fix, 1 scope-boundary defer).
+**Impact on plan:** Migration renumber was mechanical (no test or production code change beyond filename). Out-of-scope failures are appropriately deferred — Phase 31 Plan 01 introduces zero new failures and zero new TypeScript errors.
+
+## Issues Encountered
+
+- A kitchen-sink commit (`930147c`, labeled `fix(azure)`) made by a parallel agent during this plan's execution window absorbed my edits to `server/streaming/internal/module.ts` and `server/streaming/__tests__/log-parsing-integration.spec.ts`. The edits are in HEAD and functionally correct (all 17 SC1 tests pass), but Task 3's "feat(31-01)" commit was not made for the code portion. The deferred-items doc was committed separately as `014add3`. This is a tooling artifact, not a correctness issue — git diff confirms the working tree matches the intended Task 3 state.
+
+## User Setup Required
+
+None - no external service configuration required. The `failure_class` migration must be applied to any environment running the server (`npx drizzle-kit migrate` or `psql -f server/db/migrations/0008_jobs_failure_class.sql`); this is part of the standard migration flow, not a manual setup step.
+
+## Next Phase Readiness
+
+- SC1 closed. Dashboard "Crash detected" badge work (manual verification per VALIDATION.md) can proceed.
+- `jobs.failure_class` column is queryable for `WHERE failure_class = 'crash'` filtering — downstream taxonomy phases (ANR, OOM, RuntimeException subtype) extend the enum without code changes here.
+- `parseLogcatLine` reusable from any subscriber (e.g., Plan 31-02 batched flush queue can attach parsed metadata at flush time if desired).
+- Plan 31-02 (SC2 WS batch-flush) already committed (`7f6c2d0`); Plan 31-03 (SC3 boot options) already committed (`715b3b5`); Plan 31-04 (SC4 update banner) already committed (`82f2d97` + `a7c7c69` + `cd36651`). Phase 31 is one PLAN away from "all summaries written" status.
+
+## Self-Check: PASSED
+
+Verified before state updates:
+
+- `server/jobs/log-parsing.ts` — FOUND (52 lines, exports parseLogcatLine + ParsedLogcat)
+- `server/db/migrations/0008_jobs_failure_class.sql` — FOUND (CREATE TYPE + ALTER TABLE)
+- `server/db/schema.ts` — failureClassEnum + failureClass column present
+- `server/streaming/internal/module.ts` — parseLogcatLine import, firstCrashSeen Set, handleLog function, crash-detected emit, cleanup subscriber clearing all present
+- Commit `adf2ec0` — FOUND (`git log --oneline | grep adf2ec0`)
+- Commit `73bfd2b` — FOUND
+- Commit `014add3` — FOUND
+- Commit `930147c` — FOUND (contains Task 3 code changes)
+- `npx vitest run server/jobs/__tests__/log-parsing.spec.ts server/streaming/__tests__/log-parsing-integration.spec.ts` — 17 passed, 1 skipped (sentinel)
+
+---
+*Phase: 31-quick-wins*
+*Completed: 2026-05-15*
