@@ -20,7 +20,8 @@
  *   - Emit job.completed with terminal status (Phase 19 unchanged shape)
  *   - On any throw: emit job.failed with {step, reason}; do NOT re-throw
  */
-import { writeFile, stat } from 'node:fs/promises';
+import { writeFile, stat, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type pino from 'pino';
@@ -36,6 +37,7 @@ import {
   type ParallelDeployJobInput,
 } from './build-once-deploy-n.js';
 import { mapStepsForPersistence } from './step-mapper.js';
+import { loadCommandTimestamps } from './commands-json-loader.js';
 
 /**
  * Phase 37 Plan 37-04 — type guard for parallel-deploy job metadata.
@@ -153,13 +155,17 @@ export async function runJob(
 
       const installAndLaunch: InstallAndLaunch = async (device, artifact, flow, env) => {
         const adbSerial = device.port != null ? `emulator-${device.port}` : device.id;
+        const subJobId = `${jobId}-${device.id}`;
         const flowDir = await executor.writeFlowFiles(
-          `${jobId}-${device.id}`,
+          subJobId,
           [{ filename: 'flow.yaml', content: flow }],
         );
+        const outputDir = join(flowDir, 'output');
+        await mkdir(outputDir, { recursive: true });
         await executor.execute({
-          jobId: `${jobId}-${device.id}`,
+          jobId: subJobId,
           flowDir,
+          outputDir,
           deviceId: adbSerial,
           platform: device.platform,
           signal: abortController.signal,
@@ -271,6 +277,8 @@ export async function runJob(
       (fastify.config as unknown as { jobs?: { timeout_minutes?: number } }).jobs?.timeout_minutes ?? 30;
     const executor = new JobExecutor(log as pino.Logger, timeoutMinutes);
     const flowDir = await executor.writeFlowFiles(jobId, files);
+    const outputDir = join(flowDir, 'output');
+    await mkdir(outputDir, { recursive: true });
 
     jobsModule.emit.status(jobId, {
       jobId,
@@ -280,6 +288,7 @@ export async function runJob(
     const result = await executor.execute({
       jobId,
       flowDir,
+      outputDir,
       deviceId: adbSerial,
       platform: row.platform,
       signal: abortController.signal,
@@ -306,7 +315,6 @@ export async function runJob(
     // Phase 21 contract — artifacts subscriber creates the log artifact row.
     try {
       const logPath = `${LOG_BASE}/${jobId}/maestro.log`;
-      const { mkdir } = await import('node:fs/promises');
       await mkdir(`${LOG_BASE}/${jobId}`, { recursive: true });
       await writeFile(logPath, result.rawOutput, 'utf-8');
       const fileSize = await getFileSizeSafe(logPath);
@@ -346,7 +354,14 @@ export async function runJob(
         })
         .where(eq(schema.jobs.id, jobId));
       if (result.steps.length > 0) {
-        const rows = mapStepsForPersistence(jobId, result.steps, result.commandTimestamps ?? new Map());
+        const baseTs = result.commandTimestamps ?? new Map();
+        // Maestro's commands-*.json (when present) has higher fidelity timestamps
+        // than our stdout wallclock. Merge it in as overrides.
+        const overrides = await loadCommandTimestamps(outputDir);
+        for (const [cmd, ts] of overrides) {
+          baseTs.set(cmd, ts);
+        }
+        const rows = mapStepsForPersistence(jobId, result.steps, baseTs);
         await fastify.db.insert(schema.jobSteps).values(rows as never);
       }
     } catch (err) {
