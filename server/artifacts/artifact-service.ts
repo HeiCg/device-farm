@@ -21,6 +21,7 @@ export interface CreateArtifactOpts {
   fileName: string;
   mimeType: string;
   fileSizeBytes?: number;
+  videoStartedAt?: Date;  // Task 1.6 — wall-clock when recording started (video artifacts only)
 }
 
 export class ArtifactService {
@@ -63,6 +64,7 @@ export class ArtifactService {
       fileName: opts.fileName,
       mimeType: opts.mimeType,
       fileSizeBytes: opts.fileSizeBytes,
+      videoStartedAt: opts.videoStartedAt ?? null,
     }).returning({ id: schema.artifacts.id });
 
     this.logger.info(
@@ -98,6 +100,7 @@ export class ArtifactService {
       fileName: opts.fileName,
       mimeType: opts.mimeType,
       fileSizeBytes: opts.fileSizeBytes,
+      videoStartedAt: opts.videoStartedAt ?? null,
     })
       .onConflictDoNothing({ target: schema.artifacts.recordingId })
       .returning({ id: schema.artifacts.id });

@@ -268,6 +268,7 @@ export function createArtifactsModule(deps: CreateArtifactsModuleDeps): Artifact
                   codec: result.codec,
                   fileName: 'recording.mp4',
                   mimeType: 'video/mp4',
+                  videoStartedAt: result.videoStartedAt,
                 };
                 await deps.fastify.queue.send(
                   RECORDING_UPLOAD_QUEUE_NAME,

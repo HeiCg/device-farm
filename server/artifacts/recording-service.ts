@@ -18,6 +18,7 @@ export interface RecordingResult {
   duration: number;
   frameCount: number;
   codec: 'h264' | 'mjpeg';
+  videoStartedAt: Date;
 }
 
 /** adb shell screenrecord — records directly on device, then pulled at stop. */
@@ -28,6 +29,7 @@ interface AdbRecordingEntry {
   outputPath: string;
   jobId: string;
   startedAt: number;
+  videoStartedAt: Date;
 }
 
 /**
@@ -82,6 +84,7 @@ export class RecordingService {
       outputPath,
       jobId,
       startedAt: Date.now(),
+      videoStartedAt: new Date(),
     });
     this.logger.info({ jobId, platform, outputPath, method: 'adb-screenrecord' }, 'Started recording');
   }
@@ -93,7 +96,7 @@ export class RecordingService {
   }
 
   private async stopAdbRecording(entry: AdbRecordingEntry): Promise<RecordingResult> {
-    const { process: child, deviceSerial, devicePath, outputPath, jobId, startedAt } = entry;
+    const { process: child, deviceSerial, devicePath, outputPath, jobId, startedAt, videoStartedAt } = entry;
     this.adbRecordings.delete(jobId);
 
     child.kill('SIGINT');
@@ -120,10 +123,10 @@ export class RecordingService {
 
       this.logger.info({ jobId, duration, outputPath }, 'ADB recording saved');
 
-      return { outputPath, duration, frameCount: 0, codec: 'h264' };
+      return { outputPath, duration, frameCount: 0, codec: 'h264', videoStartedAt };
     } catch (err: any) {
       this.logger.error({ jobId, error: err.message }, 'Failed to pull recording from device');
-      return { outputPath, duration: 0, frameCount: 0, codec: 'h264' };
+      return { outputPath, duration: 0, frameCount: 0, codec: 'h264', videoStartedAt };
     }
   }
 

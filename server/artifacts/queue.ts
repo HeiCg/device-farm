@@ -69,14 +69,15 @@ export const RECORDING_UPLOAD_QUEUE_NAME = QUEUE_NAMES.RECORDING_UPLOAD;
  * asynchronously on slow filesystems; payload captures only the minimal shape).
  */
 export const recordingUploadPayloadSchema = z.object({
-  jobId:        z.string().uuid(),
-  recordingId:  z.string().uuid(),
-  outputPath:   z.string(),
-  durationSec:  z.number().nonnegative(),
-  frameCount:   z.number().int().nonnegative(),
-  codec:        z.string(),
-  fileName:     z.string(),    // e.g. 'recording.mp4'
-  mimeType:     z.string(),    // e.g. 'video/mp4'
+  jobId:           z.string().uuid(),
+  recordingId:     z.string().uuid(),
+  outputPath:      z.string(),
+  durationSec:     z.number().nonnegative(),
+  frameCount:      z.number().int().nonnegative(),
+  codec:           z.string(),
+  fileName:        z.string(),    // e.g. 'recording.mp4'
+  mimeType:        z.string(),    // e.g. 'video/mp4'
+  videoStartedAt:  z.coerce.date().optional(),  // Task 1.6 — wall-clock when recording started
 });
 export type RecordingUploadPayload = z.infer<typeof recordingUploadPayloadSchema>;
 
@@ -142,6 +143,7 @@ export async function registerArtifactsWorker(
         fileName: parsed.fileName,
         mimeType: parsed.mimeType,
         fileSizeBytes,
+        videoStartedAt: parsed.videoStartedAt,
       });
 
       if (created) {

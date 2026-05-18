@@ -53,6 +53,7 @@ export function makeStubRecordingService(): StubRecordingService {
         frameCount: 30,
         codec: 'h264',
         errors: [],
+        videoStartedAt: new Date(),
       };
     },
     killRecording: (jobId) => {
