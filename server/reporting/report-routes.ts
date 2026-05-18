@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import type { FastifyZodOpenApiTypeProvider, FastifyZodOpenApiSchema } from 'fastify-zod-openapi';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, gte, isNotNull } from 'drizzle-orm';
 import { generateJUnitXML } from './junit-generator.js';
 import { createHttpError } from '../api/error-handler.js';
 import { webhookCreateRequestSchema, webhookSchema } from './schemas.js';
 import * as schema from '../db/schema.js';
 import { buildReportBundle, type ReportStep } from './report-bundle-service.js';
+import { aggregateSuites, type SuiteInput } from './suite-aggregation-service.js';
 
 export async function reportRoutes(fastify: FastifyInstance): Promise<void> {
   /**
@@ -166,6 +167,32 @@ export async function reportRoutes(fastify: FastifyInstance): Promise<void> {
     });
 
     void reply; // reply is unused — Fastify serialises the return value
+  });
+
+  /**
+   * GET /jobs/suites - Suite aggregation: per-flow counts, pass rate, trend, last run info.
+   *
+   * Query param: windowDays (default 7) — how many days of job_steps to include.
+   * Returns SuiteAggregate[] sorted by flowName insertion order (Map preserves insertion).
+   */
+  fastify.get<{ Querystring: { windowDays?: string } }>('/jobs/suites', async (req) => {
+    const { windowDays = '7' } = req.query;
+    const cutoff = new Date(Date.now() - parseInt(windowDays, 10) * 24 * 60 * 60 * 1000);
+
+    const rows = await fastify.db
+      .select({
+        flowName: schema.jobSteps.flowName,
+        status: schema.jobSteps.status,
+        durationMs: schema.jobSteps.durationMs,
+        finishedAt: schema.jobSteps.finishedAt,
+      })
+      .from(schema.jobSteps)
+      .where(and(
+        isNotNull(schema.jobSteps.flowName),
+        gte(schema.jobSteps.startedAt, cutoff),
+      ));
+
+    return aggregateSuites(rows.filter((r): r is SuiteInput => r.flowName !== null));
   });
 }
 
