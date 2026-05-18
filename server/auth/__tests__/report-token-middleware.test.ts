@@ -10,7 +10,6 @@ import { describe, it, expect } from 'vitest';
 import {
   isTokenAllowedPath,
   extractJobId,
-  TOKEN_ALLOWED_PATTERNS,
   createReportTokenService,
 } from '../report-token.js';
 

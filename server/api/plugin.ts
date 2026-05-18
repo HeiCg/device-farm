@@ -43,7 +43,8 @@ export default fp(
           const pathname = req.url.split('?')[0];
           if (!isTokenAllowedPath(pathname)) return;
 
-          const t = (req.query as Record<string, string | undefined>).t;
+          const raw = (req.query as Record<string, unknown>).t;
+          const t = typeof raw === 'string' ? raw : undefined;
           if (!t) return;
 
           const jobId = extractJobId(pathname);
