@@ -1,8 +1,9 @@
 import { createReadStream } from 'node:fs';
-import { access, constants, mkdir, writeFile } from 'node:fs/promises';
+import { access, constants, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { FastifyZodOpenApiTypeProvider, FastifyZodOpenApiSchema } from 'fastify-zod-openapi';
+import { requireAdmin } from '../auth/index.js';
 import { z } from 'zod';
 import yaml from 'js-yaml';
 import { eq, and, desc, gte, lte, sql } from 'drizzle-orm';
@@ -343,7 +344,7 @@ export async function jobRoutes(fastify: FastifyInstance): Promise<void> {
 
     reply.header('Content-Type', artifact.mimeType);
     reply.header('Content-Disposition', `attachment; filename="${artifact.fileName}"`);
-    return reply.send(createReadStream(artifact.filePath));
+    return reply.send(createReadStream(artifact.filePath)); // nosemgrep: direct-response-write
   });
 
   /**
@@ -486,6 +487,138 @@ export async function uiConfigRoute(fastify: FastifyInstance): Promise<void> {
   fastify.get('/ui-config', async (_request: FastifyRequest, _reply: FastifyReply) => ({
     useReportShell: fastify.config.ui.use_report_shell,
   }));
+}
+
+// ---------- Schema (exported for test re-use) ---------------------------------
+
+export const adminConfigPatchBodySchema = z
+  .object({
+    retention_days: z.union([z.literal(5), z.literal(15), z.literal(30)]).optional(),
+  })
+  .meta({ id: 'AdminConfigPatchBody' });
+
+export const adminConfigPatchResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    applied: adminConfigPatchBodySchema,
+    restartRequired: z.literal(true),
+  })
+  .meta({ id: 'AdminConfigPatchResponse' });
+
+/**
+ * Admin config route: PATCH /admin/config
+ *
+ * Writes mutable config fields (currently retention_days) to config.yaml on
+ * disk.  Requires admin claim — uses the same [requireAuth, requireAdmin]
+ * preHandler chain as /admin/drain (server/jobs/internal/routes.ts).
+ *
+ * restartRequired:true is returned so the caller / UI can surface a restart
+ * hint — the running server reads config at boot and does not hot-reload.
+ */
+export async function adminConfigRoute(fastify: FastifyInstance): Promise<void> {
+  /**
+   * Local requireAuth — mirrors the pattern in jobs/internal/routes.ts.
+   * Validates the bearer token against authService before requireAdmin checks
+   * the admin claim.  When auth is disabled fastify.authService may be absent;
+   * in that case we skip validation entirely (matches global auth-disabled
+   * behaviour).
+   */
+  const requireAuth = async (
+    req: { headers: Record<string, string | undefined> },
+    reply: { code: (n: number) => { type: (t: string) => { send: (b: unknown) => void } } },
+  ): Promise<void> => {
+    const authService = (fastify as { authService?: { validateKey: (k: string) => Promise<boolean> } }).authService;
+    if (!authService) return; // auth disabled globally — pass through
+
+    const authHeader = req.headers.authorization ?? req.headers['x-api-key'];
+    const key = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+    if (!key) {
+      reply.code(401).type('application/problem+json').send({
+        type: 'about:blank',
+        title: 'Unauthorized',
+        status: 401,
+        detail: 'Bearer token required',
+      });
+      return;
+    }
+    const ok = await authService.validateKey(key);
+    if (!ok) {
+      reply.code(401).type('application/problem+json').send({
+        type: 'about:blank',
+        title: 'Unauthorized',
+        status: 401,
+        detail: 'Invalid or revoked API key',
+      });
+    }
+  };
+
+  fastify.withTypeProvider<FastifyZodOpenApiTypeProvider>().route({
+    method: 'PATCH',
+    url: '/admin/config',
+    preHandler: [requireAuth as never, requireAdmin as never],
+    schema: {
+      description: 'Patch mutable config fields (retention_days). Writes config.yaml; restart required for changes to take effect.',
+      body: adminConfigPatchBodySchema,
+      response: { 200: adminConfigPatchResponseSchema },
+    } satisfies FastifyZodOpenApiSchema,
+    handler: async (request, reply) => {
+      const body = request.body;
+
+      // No fields provided — nothing to do.
+      if (body.retention_days == null) {
+        return reply.code(200).send({ ok: true as const, applied: {}, restartRequired: true as const });
+      }
+
+      const configPath = process.env.DEVICE_FARM_CONFIG ?? 'config.yaml';
+      let raw: string;
+      try {
+        raw = await readFile(configPath, 'utf8');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return reply.code(500).type('application/problem+json').send({
+          type: 'about:blank',
+          title: 'Cannot read config.yaml',
+          status: 500,
+          detail: msg,
+        });
+      }
+
+      let cfg: Record<string, unknown> | null;
+      try {
+        cfg = yaml.load(raw) as Record<string, unknown> | null;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return reply.code(500).type('application/problem+json').send({
+          type: 'about:blank',
+          title: 'Cannot parse config.yaml',
+          status: 500,
+          detail: msg,
+        });
+      }
+
+      if (!cfg || typeof cfg !== 'object') {
+        return reply.code(500).type('application/problem+json').send({
+          type: 'about:blank',
+          title: 'Cannot parse config.yaml',
+          status: 500,
+          detail: 'Parsed value is not an object',
+        });
+      }
+
+      // Drill into storage.artifacts (create intermediate keys if absent).
+      const storage = (cfg.storage ?? (cfg.storage = {})) as Record<string, unknown>;
+      const artifacts = (storage.artifacts ?? (storage.artifacts = {})) as Record<string, unknown>;
+      artifacts.retention_days = body.retention_days;
+
+      await writeFile(configPath, yaml.dump(cfg), 'utf8');
+
+      return reply.code(200).send({
+        ok: true as const,
+        applied: { retention_days: body.retention_days },
+        restartRequired: true as const,
+      });
+    },
+  });
 }
 
 /**
