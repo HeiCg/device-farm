@@ -1,66 +1,55 @@
-# Device Farm Configuration
-# Override with environment variables:
-#   DEVICE_FARM_PORT     -> server.port
-#   DEVICE_FARM_CONFIG   -> path to this file
-#   DATABASE_URL         -> database connection string
-
 server:
   port: 3000
-  host: "0.0.0.0"
-
+  host: 0.0.0.0
 pool:
   max_devices: 10
   android:
     enabled: true
     max_instances: 1
     headless: true
-    api_level: "35"
-    system_image_variant: "google_apis_playstore"
-    device_profile: "pixel_7"
+    api_level: '35'
+    system_image_variant: google_apis_playstore
+    device_profile: pixel_7
     ram_mb: 2048
   ios:
     enabled: true
     max_instances: 1
-    runtime: "iOS-18-5"
-    device_type: "iPhone-16"
-
+    runtime: iOS-18-5
+    device_type: iPhone-16
 storage:
   artifacts:
-    path: "./storage/artifacts"
-    retention_days: 30
+    path: ./storage/artifacts
+    retention_days: 15
     compress_after_days: 7
-    format: "mp4"
+    format: mp4
     max_storage_gb: 50
   logs:
     retention_days: 90
-    path: "./storage/logs"
-
+    path: ./storage/logs
 jobs:
   timeout_minutes: 30
   max_queue_size: 100
   cleanup_completed_after_days: 7
-
-# Metadata schema for job submissions
-# The device farm stores and displays these fields but does not interpret them.
-# Works with any CI provider (Azure, GitHub, Bitbucket, GitLab).
+ui:
+  use_report_shell: true
 job_metadata_schema:
   required: []
   optional:
-    - name: "branch"
-      type: "string"
-    - name: "commit_sha"
-      type: "string"
-    - name: "pr_number"
-      type: "string"
-    - name: "pr_url"
-      type: "string"
-    - name: "triggered_by"
-      type: "string"
-    - name: "ci_provider"
-      type: "string"
-    - name: "ci_build_url"
-      type: "string"
-    - name: "repository"
-      type: "string"
-    - name: "tags"
-      type: "string[]"
+    - name: branch
+      type: string
+    - name: commit_sha
+      type: string
+    - name: pr_number
+      type: string
+    - name: pr_url
+      type: string
+    - name: triggered_by
+      type: string
+    - name: ci_provider
+      type: string
+    - name: ci_build_url
+      type: string
+    - name: repository
+      type: string
+    - name: tags
+      type: string[]

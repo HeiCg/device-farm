@@ -46,3 +46,6 @@ job_metadata_schema:
 
 auth:
   enabled: false
+
+ui:
+  use_report_shell: true
