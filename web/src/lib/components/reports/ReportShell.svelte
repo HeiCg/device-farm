@@ -31,8 +31,8 @@
   onShareClick={() => (shareOpen = true)}
 />
 
-<div class="grid grid-cols-1 xl:grid-cols-[240px_1fr_360px] gap-5">
-  <aside class="hidden xl:block sticky top-44 self-start max-h-[calc(100vh-12rem)] overflow-y-auto pr-2">
+<div class="grid grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)_420px] gap-4">
+  <aside class="hidden xl:block sticky top-28 self-start max-h-[calc(100vh-9rem)] overflow-y-auto pr-2">
     <FlowStepTree
       steps={bundle.steps}
       {activeStepId}

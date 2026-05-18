@@ -30,7 +30,11 @@
 {#if useReportShell === null}
 	<div class="text-[13px] text-on-surface-variant">Loading…</div>
 {:else if useReportShell && bundle}
-	<ReportShell {bundle} />
+	<div class="relative w-screen left-1/2 -translate-x-1/2 -mx-6">
+		<div class="px-6 xl:px-8">
+			<ReportShell {bundle} />
+		</div>
+	</div>
 {:else if useReportShell && error}
 	<div class="text-tertiary">{error}</div>
 {:else}
