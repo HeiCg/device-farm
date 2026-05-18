@@ -8,19 +8,26 @@ const FLOW_RESULT =
   /^(?:\[shard \d+\] )?\[(Passed|Failed|Canceled)\] (.+?) \((\d+)s\)$/;
 const SUITE_SUMMARY = /^(\d+)\/(\d+) Flows? (Passed|Failed)/;
 
+export interface MaestroParserOpts {
+  clock?: () => Date;
+}
+
 export class MaestroParser {
   private callbacks: ParserCallbacks;
+  private clock: () => Date;
   private currentFlow: string | null = null;
   private flowResults: Map<string, 'passed' | 'failed' | 'skipped'> =
     new Map();
   private flowDurations: Map<string, number> = new Map();
   private steps: JobStep[] = [];
   private commandSteps: JobStep[] = [];
+  private commandTimestamps: Map<string, { startedAt: Date; endedAt?: Date }> = new Map();
   private rawOutput: string[] = [];
   private suiteSummary: { passed: number; total: number } | null = null;
 
-  constructor(callbacks: ParserCallbacks) {
+  constructor(callbacks: ParserCallbacks, opts: MaestroParserOpts = {}) {
     this.callbacks = callbacks;
+    this.clock = opts.clock ?? (() => new Date());
   }
 
   parseLine(rawLine: string): void {
@@ -80,6 +87,20 @@ export class MaestroParser {
         : status === 'SKIPPED' ? 'skipped' as const
         : 'running' as const;
 
+      // Wallclock: RUNNING marks startedAt; terminal status marks endedAt.
+      const key = command;
+      if (status === 'RUNNING') {
+        this.commandTimestamps.set(key, { startedAt: this.clock() });
+      } else {
+        const entry = this.commandTimestamps.get(key);
+        if (entry) {
+          entry.endedAt = this.clock();
+        } else {
+          const now = this.clock();
+          this.commandTimestamps.set(key, { startedAt: now, endedAt: now });
+        }
+      }
+
       // Deduplicate: Maestro emits command status twice (RUNNING then COMPLETED/FAILED).
       // Only keep the terminal status by replacing or adding.
       const existing = this.commandSteps.findIndex(
@@ -129,6 +150,10 @@ export class MaestroParser {
   /** Get only command-level steps (always populated). */
   getCommandSteps(): JobStep[] {
     return [...this.commandSteps];
+  }
+
+  getCommandTimestamps(): Map<string, { startedAt: Date; endedAt?: Date }> {
+    return new Map(this.commandTimestamps);
   }
 
   getSummary(): JobSummary {
