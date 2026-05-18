@@ -10,18 +10,12 @@
   } = $props();
 
   let groups = $derived(groupStepsByFlow(steps));
-
-  function fmtTime(iso: string | null): string {
-    if (!iso) return '';
-    const d = new Date(iso);
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
-  }
 </script>
 
 <nav class="text-[12px]">
   {#each groups as [flow, list]}
     <div class="mb-2">
-      <div class="px-2 py-1 font-mono text-on-surface-variant text-[11px] uppercase tracking-wide">{flow}</div>
+      <div class="px-2 py-1 font-mono text-on-surface-variant text-[11px] uppercase tracking-wide truncate">{flow}</div>
       <ul>
         {#each list as step, i (step.id)}
           <li>
@@ -37,10 +31,7 @@
               <span class="w-5 text-right text-[10px] text-on-surface-variant font-mono shrink-0">{i + 1}</span>
               <StatusBadge status={step.status} size={12} />
               <span class="truncate flex-1 font-mono">{step.command ?? step.flowName}</span>
-              {#if step.startedAt}
-                <span class="text-[10px] text-on-surface-variant font-mono shrink-0">{fmtTime(step.startedAt)}</span>
-              {/if}
-              <span class="text-[10px] text-on-surface-variant w-10 text-right shrink-0">{formatDuration(step.durationMs)}</span>
+              <span class="text-[10px] text-on-surface-variant w-12 text-right shrink-0">{formatDuration(step.durationMs)}</span>
             </button>
           </li>
         {/each}

@@ -19,6 +19,13 @@
   let markersMs = $derived(
     bundle.steps.map((s) => s.videoOffsetMs).filter((m): m is number => m != null),
   );
+  let hasHistory = $derived(!!bundle.history && bundle.history.runs.length > 0);
+  let hasRightPane = $derived(!!video || hasHistory);
+  let gridClass = $derived(
+    hasRightPane
+      ? 'grid grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)_420px] gap-4'
+      : 'grid grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)] gap-4',
+  );
 
   function jumpToVideo(offsetMs: number) {
     videoHandle?.seekTo(offsetMs);
@@ -31,7 +38,7 @@
   onShareClick={() => (shareOpen = true)}
 />
 
-<div class="grid grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)_420px] gap-4">
+<div class={gridClass}>
   <aside class="hidden xl:block sticky top-28 self-start max-h-[calc(100vh-9rem)] overflow-y-auto pr-2">
     <FlowStepTree
       steps={bundle.steps}
@@ -52,17 +59,21 @@
     {/if}
   </section>
 
-  <aside class="hidden xl:block space-y-4">
-    {#if video}
-      <SyncVideoPlayer
-        src={video.downloadUrl}
-        {markersMs}
-        durationMs={bundle.job.durationMs}
-        onRef={(h) => (videoHandle = h)}
-      />
-    {/if}
-    <HistoryStrip history={bundle.history} />
-  </aside>
+  {#if hasRightPane}
+    <aside class="hidden xl:block space-y-4">
+      {#if video}
+        <SyncVideoPlayer
+          src={video.downloadUrl}
+          {markersMs}
+          durationMs={bundle.job.durationMs}
+          onRef={(h) => (videoHandle = h)}
+        />
+      {/if}
+      {#if hasHistory}
+        <HistoryStrip history={bundle.history} />
+      {/if}
+    </aside>
+  {/if}
 </div>
 
 <ShareLinkDialog

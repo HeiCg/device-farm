@@ -12,6 +12,9 @@
 	let { children } = $props();
 
 	let onLoginPage = $derived(page.url?.pathname.startsWith('/login'));
+	// Full-bleed routes opt out of the max-w-6xl wrapper so they can fill the
+	// available area (sidebar still consumes 256px on the left at md+).
+	let fullBleed = $derived(/^\/jobs\/[^/]+$/.test(page.url?.pathname ?? ''));
 	let authChecked = $state(false);
 
 	// Phase 36 Plan 36-03 — CommandPalette ⌘K wiring.
@@ -64,9 +67,15 @@
 		<Header />
 		<Nav />
 		<main class="md:pl-64 pt-16 pb-20 md:pb-0 min-h-screen">
-			<div class="max-w-6xl mx-auto p-6">
-				{@render children()}
-			</div>
+			{#if fullBleed}
+				<div class="p-4">
+					{@render children()}
+				</div>
+			{:else}
+				<div class="max-w-6xl mx-auto p-6">
+					{@render children()}
+				</div>
+			{/if}
 		</main>
 		<MobileNav />
 		<CommandPalette bind:this={paletteRef} />

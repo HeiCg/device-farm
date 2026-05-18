@@ -34,8 +34,9 @@
   {#if step.screenshotPath}
     <img src={step.screenshotPath} alt="Step screenshot" class="rounded border border-outline-variant/20 max-w-full" />
   {:else}
-    <div data-testid="screenshot-placeholder" class="aspect-[9/16] max-w-xs bg-surface-variant/30 rounded flex items-center justify-center text-on-surface-variant text-[12px]">
-      <span class="material-symbols-outlined">broken_image</span>
+    <div data-testid="screenshot-placeholder" class="inline-flex items-center gap-2 rounded bg-surface-variant/30 px-3 py-2 text-on-surface-variant text-[12px]">
+      <span class="material-symbols-outlined text-[16px]">image_not_supported</span>
+      <span>No screenshot for this step</span>
     </div>
   {/if}
 
