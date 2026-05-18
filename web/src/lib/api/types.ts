@@ -268,6 +268,8 @@ export interface ReportBundle {
 		createdAt: string; startedAt: string | null; finishedAt: string | null;
 		deviceId: string | null; durationMs: number | null;
 		summary: { total: number; passed: number; failed: number; skipped: number };
+		maestroVersion?: string | null;
+		osVersion?: string | null;
 	};
 	steps: ReportStepLite[];
 	artifacts: ReportArtifactLite[];

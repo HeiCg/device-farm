@@ -346,11 +346,22 @@ export async function runJob(
 
     // Persist steps + result-summary (preserves existing job-service.ts behavior).
     try {
+      // Merge maestroVersion + osVersion into existing metadata (JSONB).
+      // Spread existing metadata first so we never clobber pre-existing keys
+      // (e.g. boot_options, mode, apk_path written at job creation time).
+      const existingMetadata = (row.metadata as Record<string, unknown> | null) ?? {};
+      const mergedMetadata: Record<string, unknown> = {
+        ...existingMetadata,
+        ...(result.maestroVersion != null && { maestroVersion: result.maestroVersion }),
+        ...(result.osVersion != null && { osVersion: result.osVersion }),
+      };
+
       await fastify.db
         .update(schema.jobs)
         .set({
           resultSummary: result.summary as never,
           maestroOutput: result.rawOutput,
+          metadata: mergedMetadata,
         })
         .where(eq(schema.jobs.id, jobId));
       if (result.steps.length > 0) {

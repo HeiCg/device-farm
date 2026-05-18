@@ -60,6 +60,18 @@
         {fmtDate(job.finishedAt)}
       </span>
     {/if}
+    {#if job.osVersion}
+      <span class="inline-flex items-center gap-1 rounded-full bg-surface-variant/40 px-2.5 py-1">
+        <span class="material-symbols-outlined text-[14px]">layers</span>
+        OS {job.osVersion}
+      </span>
+    {/if}
+    {#if job.maestroVersion}
+      <span class="inline-flex items-center gap-1 rounded-full bg-surface-variant/40 px-2.5 py-1">
+        <span class="material-symbols-outlined text-[14px]">terminal</span>
+        Maestro {job.maestroVersion}
+      </span>
+    {/if}
     <span class="ml-auto text-on-surface-variant">
       <span class="text-primary">{job.summary.passed}</span> passed ·
       <span class="text-tertiary">{job.summary.failed}</span> failed ·

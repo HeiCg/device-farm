@@ -8,6 +8,41 @@ import { MaestroParser } from './maestro-parser.js';
 import type { JobStep, JobSummary, Platform, ParserCallbacks } from './types.js';
 
 const execFileAsync = promisify(execFile);
+
+// ── Module-level Maestro version cache ───────────────────────────────────────
+// undefined = not yet queried; null = unavailable; string = version string.
+let cachedMaestroVersion: string | null | undefined = undefined;
+
+async function readMaestroVersion(): Promise<string | null> {
+  if (cachedMaestroVersion !== undefined) return cachedMaestroVersion;
+  try {
+    const { stdout } = await execFileAsync('maestro', ['--version']);
+    cachedMaestroVersion = stdout.trim().split('\n')[0] ?? null;
+  } catch {
+    cachedMaestroVersion = null;
+  }
+  return cachedMaestroVersion;
+}
+
+async function readOsVersion(platform: Platform, deviceId: string): Promise<string | null> {
+  try {
+    if (platform === 'android') {
+      const { stdout } = await execFileAsync('adb', ['-s', deviceId, 'shell', 'getprop', 'ro.build.version.release']);
+      return stdout.trim() || null;
+    }
+    if (platform === 'ios') {
+      try {
+        const { stdout } = await execFileAsync('xcrun', ['simctl', 'getenv', deviceId, 'SIMULATOR_RUNTIME_VERSION']);
+        return stdout.trim() || null;
+      } catch {
+        return null;
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
 const TEMP_BASE = '/tmp/device-farm/jobs';
 const APK_BASE = '/tmp/device-farm/apks';
 const KILL_ESCALATION_MS = 5000;
@@ -19,6 +54,8 @@ export interface ExecutionResult {
   exitCode: number | null;
   status: 'passed' | 'failed' | 'timeout' | 'cancelled';
   commandTimestamps?: Map<string, { startedAt: Date; endedAt?: Date }>;
+  maestroVersion?: string | null;
+  osVersion?: string | null;
 }
 
 export interface ExecutionCallbacks extends ParserCallbacks {
@@ -178,7 +215,13 @@ export class JobExecutor {
       env.ANDROID_SERIAL = deviceId;
     }
 
-    this.logger.info({ jobId, platform, deviceId, args }, 'Spawning Maestro');
+    // Capture Maestro version (cached after first call) + OS version in parallel.
+    const [maestroVersion, osVersion] = await Promise.all([
+      readMaestroVersion(),
+      readOsVersion(platform, deviceId),
+    ]);
+
+    this.logger.info({ jobId, platform, deviceId, args, maestroVersion, osVersion }, 'Spawning Maestro');
 
     const child = spawn('maestro', args, {
       detached: true,
@@ -300,6 +343,8 @@ export class JobExecutor {
           exitCode: exitCode ?? null,
           status,
           commandTimestamps: parser.getCommandTimestamps(),
+          maestroVersion,
+          osVersion,
         });
       });
     });

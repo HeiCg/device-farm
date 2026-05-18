@@ -7,6 +7,8 @@ export interface ReportJob {
   finishedAt: Date | null;
   deviceId: string | null;
   metadata: unknown;
+  maestroVersion?: string | null;
+  osVersion?: string | null;
 }
 
 export interface ReportStep {

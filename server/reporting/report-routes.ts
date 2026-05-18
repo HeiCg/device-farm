@@ -138,6 +138,8 @@ export async function reportRoutes(fastify: FastifyInstance): Promise<void> {
     const firstFlow = stepRows.find((s) => s.flowName)?.flowName ?? null;
     const history = firstFlow ? await loadFlowHistory(fastify, firstFlow, 10) : null;
 
+    const jobMeta = (jobRow.metadata as { maestroVersion?: string; osVersion?: string } | null) ?? null;
+
     return buildReportBundle({
       job: {
         id: jobRow.id,
@@ -148,6 +150,8 @@ export async function reportRoutes(fastify: FastifyInstance): Promise<void> {
         finishedAt: jobRow.finishedAt ?? null,
         deviceId: jobRow.deviceId ?? null,
         metadata: jobRow.metadata,
+        maestroVersion: jobMeta?.maestroVersion ?? null,
+        osVersion: jobMeta?.osVersion ?? null,
       },
       steps: stepRows.map<ReportStep>((s) => ({
         id: s.id,
