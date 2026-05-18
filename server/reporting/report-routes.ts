@@ -7,6 +7,7 @@ import { webhookCreateRequestSchema, webhookSchema } from './schemas.js';
 import * as schema from '../db/schema.js';
 import { buildReportBundle, type ReportStep } from './report-bundle-service.js';
 import { aggregateSuites, type SuiteInput } from './suite-aggregation-service.js';
+import { computeTrends, type TrendInput } from './trends-service.js';
 
 export async function reportRoutes(fastify: FastifyInstance): Promise<void> {
   /**
@@ -193,6 +194,32 @@ export async function reportRoutes(fastify: FastifyInstance): Promise<void> {
       ));
 
     return aggregateSuites(rows.filter((r): r is SuiteInput => r.flowName !== null));
+  });
+
+  /**
+   * GET /jobs/trends - Pass/fail counts by day and by flow over a rolling window.
+   *
+   * Query param: windowDays (default 7) — how many days of job_steps to include.
+   * Returns TrendsOutput: byDay[], byFlow[], windowDays.
+   */
+  fastify.get<{ Querystring: { windowDays?: string } }>('/jobs/trends', async (req) => {
+    const { windowDays = '7' } = req.query;
+    const n = parseInt(windowDays, 10);
+    const cutoff = new Date(Date.now() - n * 24 * 60 * 60 * 1000);
+
+    const rows = await fastify.db
+      .select({
+        flowName: schema.jobSteps.flowName,
+        status: schema.jobSteps.status,
+        finishedAt: schema.jobSteps.finishedAt,
+      })
+      .from(schema.jobSteps)
+      .where(and(isNotNull(schema.jobSteps.flowName), gte(schema.jobSteps.finishedAt, cutoff)));
+
+    return computeTrends(
+      rows.filter((r): r is TrendInput => r.flowName !== null && r.finishedAt !== null),
+      n,
+    );
   });
 }
 
