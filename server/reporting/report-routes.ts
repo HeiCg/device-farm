@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { FastifyZodOpenApiTypeProvider, FastifyZodOpenApiSchema } from 'fastify-zod-openapi';
+import { z } from 'zod';
 import { eq, desc, and, gte, isNotNull } from 'drizzle-orm';
 import { generateJUnitXML } from './junit-generator.js';
 import { createHttpError } from '../api/error-handler.js';
@@ -8,6 +9,12 @@ import * as schema from '../db/schema.js';
 import { buildReportBundle, type ReportStep } from './report-bundle-service.js';
 import { aggregateSuites, type SuiteInput } from './suite-aggregation-service.js';
 import { computeTrends, type TrendInput } from './trends-service.js';
+
+// ── share-token request schema ────────────────────────────────────────────────
+
+const mintBodySchema = z.object({
+  ttlDays: z.union([z.literal(5), z.literal(15), z.literal(30)]),
+});
 
 export async function reportRoutes(fastify: FastifyInstance): Promise<void> {
   /**
@@ -220,6 +227,52 @@ export async function reportRoutes(fastify: FastifyInstance): Promise<void> {
       rows.filter((r): r is TrendInput => r.flowName !== null && r.finishedAt !== null),
       n,
     );
+  });
+
+  /**
+   * POST /jobs/:id/share-token — Mint a scoped share JWT for a job.
+   *
+   * Task 3.4: Returns {token, expiresAt, url} for valid requests.
+   * - 503 when sharing is disabled (reportTokenService not decorated).
+   * - 400 when ttlDays ∉ {5, 15, 30}.
+   * - 404 when the job ID is unknown.
+   * - 200 with { token, expiresAt, url } on success.
+   *
+   * Auth: the route is protected by the bearer-auth gate registered in
+   * api/plugin.ts. These tests exercise handler logic in isolation.
+   */
+  fastify.post('/jobs/:id/share-token', async (req, reply) => {
+    if (!fastify.reportTokenService) {
+      return reply.code(503).send({ type: 'about:blank', title: 'Sharing disabled', status: 503 });
+    }
+
+    const { id } = req.params as { id: string };
+
+    const body = mintBodySchema.safeParse(req.body);
+    if (!body.success) {
+      return reply.code(400).send({
+        type: 'about:blank',
+        title: 'Invalid body',
+        status: 400,
+        detail: body.error.message,
+      });
+    }
+
+    const [job] = await fastify.db
+      .select({ id: schema.jobs.id })
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, id));
+
+    if (!job) {
+      return reply.code(404).send({ type: 'about:blank', title: 'Job not found', status: 404 });
+    }
+
+    const { token, expiresAt } = await fastify.reportTokenService.mint({
+      jobId: id,
+      ttlDays: body.data.ttlDays,
+    });
+
+    return { token, expiresAt: expiresAt.toISOString(), url: `/jobs/${id}?t=${token}` };
   });
 }
 
