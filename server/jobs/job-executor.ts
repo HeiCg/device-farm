@@ -18,6 +18,7 @@ export interface ExecutionResult {
   rawOutput: string;
   exitCode: number | null;
   status: 'passed' | 'failed' | 'timeout' | 'cancelled';
+  commandTimestamps?: Map<string, { startedAt: Date; endedAt?: Date }>;
 }
 
 export interface ExecutionCallbacks extends ParserCallbacks {
@@ -291,6 +292,7 @@ export class JobExecutor {
           rawOutput: fullOutput,
           exitCode: exitCode ?? null,
           status,
+          commandTimestamps: parser.getCommandTimestamps(),
         });
       });
     });

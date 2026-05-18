@@ -35,6 +35,7 @@ import {
   type InstallAndLaunch,
   type ParallelDeployJobInput,
 } from './build-once-deploy-n.js';
+import { mapStepsForPersistence } from './step-mapper.js';
 
 /**
  * Phase 37 Plan 37-04 — type guard for parallel-deploy job metadata.
@@ -345,16 +346,8 @@ export async function runJob(
         })
         .where(eq(schema.jobs.id, jobId));
       if (result.steps.length > 0) {
-        await fastify.db.insert(schema.jobSteps).values(
-          result.steps.map((step, index) => ({
-            jobId,
-            stepIndex: index,
-            flowName: step.flowName,
-            command: step.command,
-            status: step.status as never,
-            durationMs: step.durationMs,
-          })),
-        );
+        const rows = mapStepsForPersistence(jobId, result.steps, result.commandTimestamps ?? new Map());
+        await fastify.db.insert(schema.jobSteps).values(rows as never);
       }
     } catch (err) {
       log.warn({ err }, 'Failed to persist job step results (non-fatal)');
