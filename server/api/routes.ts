@@ -479,6 +479,16 @@ export async function configRoute(fastify: FastifyInstance): Promise<void> {
 }
 
 /**
+ * UI config route: GET /ui-config -- returns feature flags for the web UI.
+ * Public (no auth) — bootstrapped before the user logs in.
+ */
+export async function uiConfigRoute(fastify: FastifyInstance): Promise<void> {
+  fastify.get('/ui-config', async (_request: FastifyRequest, _reply: FastifyReply) => ({
+    useReportShell: fastify.config.ui.use_report_shell,
+  }));
+}
+
+/**
  * Health route: GET /health
  */
 export async function healthRoute(fastify: FastifyInstance): Promise<void> {

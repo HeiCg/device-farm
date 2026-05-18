@@ -2,7 +2,7 @@ import fp from 'fastify-plugin';
 import type { FastifyInstance } from 'fastify';
 import multipart from '@fastify/multipart';
 import { errorHandler } from './error-handler.js';
-import { jobRoutes, deviceRoutes, healthRoute, configRoute } from './routes.js';
+import { jobRoutes, deviceRoutes, healthRoute, configRoute, uiConfigRoute } from './routes.js';
 import { keyRoutes } from '../auth/index.js';
 import { reportRoutes } from '../reporting/report-routes.js';
 import { registerPipelinesQueueRoute } from './internal/pipelines-queue-route.js';
@@ -30,6 +30,9 @@ export default fp(
 
     // Health endpoint -- always public (outside protected scope)
     await fastify.register(healthRoute, { prefix: '/api' });
+
+    // UI config endpoint -- always public (bootstrapped before login)
+    await fastify.register(uiConfigRoute, { prefix: '/api' });
 
     // Protected scope -- apply bearer auth when enabled
     await fastify.register(async (scope) => {
