@@ -187,6 +187,13 @@ export const configSchema = z.object({
   jobs: jobsSchema.default(jobsSchema.parse({})),
   job_metadata_schema: jobMetadataSchemaSchema.default(jobMetadataSchemaSchema.parse({})),
   database_url: z.string().default('postgresql://localhost:5432/device_farm'),
+  /**
+   * Public-facing base URL used when constructing links that are sent to
+   * external systems (e.g. Azure DevOps PR comments, webhook notifications).
+   * Must NOT have a trailing slash. Defaults to localhost so the server is
+   * usable out-of-the-box; operators MUST override this in production.
+   */
+  public_base_url: z.string().url().default('http://localhost:3000'),
   auth: authSchema.default(authSchema.parse({})),
   security: securitySchema.default(securitySchema.parse({})),
   sharing: sharingSchema.default(sharingSchema.parse({})),

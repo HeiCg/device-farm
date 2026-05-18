@@ -1,5 +1,6 @@
 import type pino from 'pino';
 import type { AzureClient } from './azure-client.js';
+import { buildReportUrl } from './build-comment-url.js';
 
 export type RunStatus = 'running' | 'passed' | 'failed' | 'cancelled';
 
@@ -40,11 +41,15 @@ const EMOJI: Record<RunStatus, string> = {
 };
 
 function render(opts: UpsertOpts, baseUrl: string): string {
+  // PR comments link to the pipeline-run page (multi-job view).
+  // Share tokens are per-job scoped; token embedding is not applicable here.
+  // See build-comment-url.ts for the full scope decision.
+  const runUrl = buildReportUrl({ baseUrl, jobId: null, pipelineRunId: opts.runId, shareToken: null });
   return [
     `### Device Farm — ${EMOJI[opts.status]}`,
     '',
     `**Status:** ${opts.status}`,
-    `**Run:** [#${opts.runId}](${baseUrl}/pipeline-runs/${opts.runId})`,
+    `**Run:** [#${opts.runId}](${runUrl})`,
     `**Commit:** \`${opts.commit.slice(0, 7)}\``,
     `**Suites:** ${opts.suites.join(', ')}`,
   ].join('\n');

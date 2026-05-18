@@ -29,10 +29,9 @@ export async function createAzureModule(deps: AzureModuleDeps): Promise<AzureMod
 
   const client = createAzureClient({ pat: cfg.pat, logger: deps.logger });
 
-  const serverHost = deps.fastify.config.server.host === '0.0.0.0'
-    ? 'localhost'
-    : deps.fastify.config.server.host;
-  const baseUrl = `http://${serverHost}:${deps.fastify.config.server.port}`;
+  // Use public_base_url when set (recommended for production deployments).
+  // This replaces the old host:port derivation which only worked for localhost.
+  const baseUrl = deps.fastify.config.public_base_url.replace(/\/$/, '');
 
   const commenter = createPrCommenter({
     client,
