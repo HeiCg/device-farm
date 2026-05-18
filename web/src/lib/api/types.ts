@@ -237,3 +237,50 @@ export function extractMaestroOptions(metadata: Record<string, unknown> | null):
 	return { includeTags, excludeTags, reportFormat, debugOutput, shards };
 }
 
+// --- Report bundle types (Phase 4 UI) ---
+
+export interface ReportStepLite {
+	id: string;
+	flowName: string | null;
+	command: string | null;
+	status: 'passed' | 'failed' | 'skipped' | 'running';
+	durationMs: number | null;
+	startedAt: string | null;
+	finishedAt: string | null;
+	error: string | null;
+	screenshotPath: string | null;
+	videoOffsetMs: number | null;
+}
+
+export interface ReportArtifactLite {
+	id: string;
+	type: 'video' | 'screenshot' | 'memory' | 'log';
+	fileName: string;
+	mimeType: string;
+	fileSizeBytes: number | null;
+	videoStartedAt?: string | null;
+	downloadUrl: string;
+}
+
+export interface ReportBundle {
+	job: {
+		id: string; status: string; platform: string;
+		createdAt: string; startedAt: string | null; finishedAt: string | null;
+		deviceId: string | null; durationMs: number | null;
+		summary: { total: number; passed: number; failed: number; skipped: number };
+	};
+	steps: ReportStepLite[];
+	artifacts: ReportArtifactLite[];
+	failureFocus: null | {
+		stepId: string; flowName: string | null; command: string | null;
+		error: string; screenshotPath: string | null;
+		logTailLines: string[]; videoOffsetMs: number | null;
+	};
+	reportLinks: { junitXml: string; logsRaw: string };
+	history: null | {
+		flowName: string | null;
+		runs: Array<{ jobId: string; status: string; finishedAt: string | null; durationMs: number | null }>;
+		passRate: number; avgDurationMs: number;
+	};
+}
+
