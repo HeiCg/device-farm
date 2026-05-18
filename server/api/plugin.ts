@@ -10,6 +10,7 @@ import { getQueueStatus } from '../pipelines/internal/queue-status.js';
 import { DeviceState } from '../types/index.js';
 import { registerPairingRoutes } from './pairing.js';
 import { registerDevicesStreamRoutes } from './devices-stream.js';
+import { isTokenAllowedPath, extractJobId } from '../auth/plugin.js';
 
 export default fp(
   async (fastify: FastifyInstance) => {
@@ -32,8 +33,38 @@ export default fp(
 
     // Protected scope -- apply bearer auth when enabled
     await fastify.register(async (scope) => {
+      // Share-token onRequest hook: must run BEFORE bearer auth so that when
+      // a valid ?t=<jwt> is present on an allowed viewer route, req.shareToken
+      // is set and the bearer-auth hook below short-circuits to allow the
+      // request through even when no Authorization header is present.
+      if (fastify.reportTokenService) {
+        const svc = fastify.reportTokenService;
+        scope.addHook('onRequest', async (req) => {
+          const pathname = req.url.split('?')[0];
+          if (!isTokenAllowedPath(pathname)) return;
+
+          const t = (req.query as Record<string, string | undefined>).t;
+          if (!t) return;
+
+          const jobId = extractJobId(pathname);
+          if (!jobId) return;
+
+          const v = await svc.verify(t, jobId);
+          if (v.ok) {
+            req.shareToken = { jobId };
+          }
+          // Invalid/expired token: fall through; bearer auth will 401 if no header.
+        });
+      }
+
       if (authEnabled && scope.verifyBearerAuth) {
-        scope.addHook('onRequest', scope.verifyBearerAuth);
+        // Wrap verifyBearerAuth to skip when req.shareToken is already set
+        // (share-token hook ran first and validated successfully).
+        const originalVerify = scope.verifyBearerAuth.bind(scope);
+        scope.addHook('onRequest', async (req, reply) => {
+          if (req.shareToken) return; // already authenticated via share token
+          return originalVerify(req, reply);
+        });
       }
 
       await scope.register(jobRoutes, { prefix: '/api' });

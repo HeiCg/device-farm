@@ -1,5 +1,30 @@
 import { SignJWT, jwtVerify, errors as joseErrors } from 'jose';
 
+// ---------------------------------------------------------------------------
+// Share-token URL allowlist helpers (used by auth/plugin.ts + api/plugin.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Routes on which a valid ?t=<jwt> share token bypasses bearer auth.
+ * Patterns match both /jobs/... and /api/jobs/... to be prefix-agnostic.
+ */
+export const TOKEN_ALLOWED_PATTERNS: RegExp[] = [
+  /^\/(api\/)?jobs\/[^/]+$/,                      // /jobs/:id
+  /^\/(api\/)?jobs\/[^/]+\/report$/,              // /jobs/:id/report
+  /^\/(api\/)?jobs\/[^/]+\/artifacts(\/.*)?$/,    // /jobs/:id/artifacts*
+  /^\/(api\/)?jobs\/[^/]+\/logs$/,                // /jobs/:id/logs
+  /^\/(api\/)?jobs\/[^/]+\/reports\/junit\.xml$/, // /jobs/:id/reports/junit.xml
+];
+
+export function extractJobId(url: string): string | null {
+  const m = url.match(/^\/(?:api\/)?jobs\/([^/]+)/);
+  return m ? m[1] : null;
+}
+
+export function isTokenAllowedPath(pathname: string): boolean {
+  return TOKEN_ALLOWED_PATTERNS.some((re) => re.test(pathname));
+}
+
 export interface ReportTokenServiceOpts {
   secret: string;
 }

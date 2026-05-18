@@ -77,6 +77,15 @@ const authSchema = z.object({
   enabled: z.boolean().default(false),
 });
 
+const securitySchema = z.object({
+  share_token_secret: z.string().min(32).optional(),
+});
+
+const sharingSchema = z.object({
+  enabled: z.boolean().default(false),
+  default_ttl_days: z.union([z.literal(5), z.literal(15), z.literal(30)]).default(30),
+});
+
 const webhooksSchema = z.object({
   url: z.string().url().optional(),
   secret: z.string().optional(),
@@ -179,6 +188,9 @@ export const configSchema = z.object({
   job_metadata_schema: jobMetadataSchemaSchema.default(jobMetadataSchemaSchema.parse({})),
   database_url: z.string().default('postgresql://localhost:5432/device_farm'),
   auth: authSchema.default(authSchema.parse({})),
+  security: securitySchema.default(securitySchema.parse({})),
+  sharing: sharingSchema.default(sharingSchema.parse({})),
+  ui: z.object({ use_report_shell: z.boolean().default(false) }).default({ use_report_shell: false }),
   webhooks: webhooksSchema.default(webhooksSchema.parse({})),
   hooks: z.array(hookSchema).default([]),
   maestro: maestroSchema.default(maestroSchema.parse({})),
@@ -190,6 +202,9 @@ export const configSchema = z.object({
   // Phase 37 Plan 37-03 — GitHub App PR integration (optional).
   github: githubSchema.optional(),
   pipelines: pipelinesConfigSchema.default(pipelinesConfigSchema.parse({})),
-});
+}).refine(
+  (cfg) => !cfg.sharing.enabled || (cfg.security.share_token_secret !== undefined && cfg.security.share_token_secret.length >= 32),
+  { message: 'security.share_token_secret is required (min 32 chars) when sharing.enabled = true' },
+);
 
 export type AppConfig = z.infer<typeof configSchema>;
