@@ -12,8 +12,9 @@
  *
  * Phase 38 (Task 3.3): Share-token middleware added. When sharing.enabled,
  * a ReportTokenService is instantiated and decorated onto the Fastify instance.
- * A preHandler hook intercepts ?t=<jwt> on allowed viewer routes and marks the
- * request as share-token-authenticated so the bearer-auth check is skipped.
+ * An onRequest hook intercepts ?t=<jwt> on allowed viewer routes and marks the
+ * request as share-token-authenticated so the bearer-auth check is skipped
+ * (must run at onRequest because @fastify/bearer-auth also fires at onRequest).
  */
 import fp from 'fastify-plugin';
 import bearerAuth from '@fastify/bearer-auth';
