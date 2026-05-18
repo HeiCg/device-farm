@@ -2,6 +2,13 @@
 
 Self-hosted test execution platform for Apple Silicon Mac Minis. Manages Android emulators and iOS simulators, executes Maestro test flows, and provides real-time observability via WebSocket streaming and a web dashboard.
 
+**Highlights**
+- 🎬 **Report viewer** — ReportPortal-style 3-pane viewer at `/jobs/[id]`: step timeline with screenshots, video sync (click a step → video seeks), failure focus panel with log tail + jump-to-video, suite/history/trends sub-tabs, device + OS + Maestro version chips. Enable with `ui.use_report_shell: true`.
+- 🔗 **Share links** — Mint per-job signed URLs (`?t=<jwt>`) for reviewers without Device Farm credentials. Plumbed into the Azure DevOps PR commenter.
+- 🪝 **Lifecycle hooks** — `device.booted` / `device.shutdown` / `test.before` / `test.after` with template variables and timeout. Wrap `adb`, `simctl`, or scripts on top of `device-stream` to install/clear/grant/dump around every job. See [`docs/runbooks/hooks-device-stream.md`](./docs/runbooks/hooks-device-stream.md).
+- 📺 **device-stream** monorepo (`device-stream/`) — TS packages + native binaries for screen streaming (the built-in Live Preview) and programmatic device control (taps/types/screenshots) reusable from hooks. See [`docs/runbooks/device-stream.md`](./docs/runbooks/device-stream.md).
+- 🗑️ **Retention** — Configurable per-artifact retention (5/15/30 days) via `/settings` UI, applied by the `lifecycle` module's daily pg-boss schedule.
+
 ## Prerequisites
 
 | Dependency | Required | Install |
@@ -331,24 +338,39 @@ cli/              # Go CLI binary
 
 ## API Endpoints
 
-The server exposes 19 REST endpoints under `/api/`:
+REST endpoints under `/api/`:
 
+**Jobs**
 - `POST /api/jobs` — Submit test job (multipart: YAML flows + metadata)
-- `GET /api/jobs` — List jobs with filters and cursor pagination
+- `GET /api/jobs` — List jobs with filters (`status`, `platform`, `flowName`, `dateFrom`, `dateTo`) and cursor pagination
 - `GET /api/jobs/:id` — Job details with steps and result
 - `GET /api/jobs/:id/logs` — Job logs
 - `GET /api/jobs/:id/recording` — Download recorded video
 - `DELETE /api/jobs/:id` — Cancel job
+
+**Report viewer** (introduced with the `ui.use_report_shell` flag)
+- `GET /api/jobs/:id/report` — Full report bundle (job + steps + artifacts + failureFocus + history)
+- `POST /api/jobs/:id/share-token` — Mint a per-job HS256 JWT for unauthenticated reviewers; pass back via `?t=<jwt>` on the viewer URL
+- `GET /api/jobs/suites` — Per-flow aggregation (counts, pass rate, sparkline trend, last run)
+- `GET /api/jobs/trends` — Pass/fail series by day and by flow
+- `GET /api/jobs/:id/report.xml` — JUnit XML report
+
+**Devices**
 - `GET /api/devices` — List all devices and status
 - `POST /api/devices/:id/restart` — Restart a device
+
+**Hooks** (lifecycle setup/teardown — see `docs/runbooks/hooks-device-stream.md`)
+- `GET|POST /api/hooks`, `PUT|DELETE /api/hooks/:name`, `POST /api/hooks/:name/test`
+
+**Server / config**
 - `GET /api/health` — Server + pool health
 - `GET /api/config` — Server configuration (sanitized)
-- `GET /api/reports/junit/:id` — JUnit XML report
+- `GET /api/ui-config` — UI feature flags (public, used by the web app to decide which views to render)
+- `PATCH /api/admin/config` — Update mutable settings (e.g., `retention_days: 5|15|30`); admin auth required
 - `GET /api/reports/flaky` — Flaky test report
-- `POST /api/auth/keys` — Create API key
-- `GET /api/auth/keys` — List API keys
-- `DELETE /api/auth/keys/:id` — Revoke API key
-- `POST /api/auth/validate` — Validate API key
+
+**Auth**
+- `POST /api/auth/keys`, `GET /api/auth/keys`, `DELETE /api/auth/keys/:id`, `POST /api/auth/validate`
 
 WebSocket endpoints:
 - `GET /ws/jobs/:id` — Live job logs + step updates

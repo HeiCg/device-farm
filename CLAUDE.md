@@ -54,6 +54,20 @@ DEVICE_FARM_CONFIG=config.dev.yaml npm run dev  # Disables device pools
 Plugins must register in dependency order. Each declares `{ dependencies: ['...'] }`:
 1. config → 2. dependency-checker → 3. pool → 4. db → 5. auth → 6. websocket → 7. artifacts → 8. reporting → 9. jobs → 10. lifecycle → 11. api → 12. static
 
+### device-stream Monorepo (`device-stream/`)
+In-repo npm workspaces (`@device-stream/*`) plus native binaries that handle device control + streaming. The `streaming/` and `sessions/` modules consume the packages; **lifecycle hooks** can also invoke them via tsx scripts (see `docs/runbooks/device-stream.md` and `docs/runbooks/hooks-device-stream.md`). Per-device `DeviceMutexManager` (in `@device-stream/core`) serialises commands across streams, sessions, and hook-triggered scripts so they don't fight each other.
+
+### Lifecycle Hooks (`server/hooks/`)
+User-defined shell commands triggered at 4 events: `device.booted`, `device.shutdown`, `test.before`, `test.after`. Setup/teardown for jobs lives here. Commands accept `{{serial}}`, `{{platform}}`, `{{job_id}}`, `{{device_id}}`, `{{emulator_id}}`, `{{port}}` template variables. Sequential per event, retry-safe via `hook_runs.operation_key`. Managed at `/api/hooks` (CRUD + `/test`).
+
+### Report Viewer
+- `/jobs/[id]` switches to a 3-pane `ReportShell` (tree | step detail | video/history) behind the `ui.use_report_shell` config flag. Legacy `LegacyJobView.svelte` preserves the rollback path.
+- `GET /jobs/:id/report` returns the full bundle (job + steps + artifacts + failureFocus + history). Pure assembler is `server/reporting/report-bundle-service.ts`; route adds DB IO + log-tail extraction + flow history.
+- Sub-tabs in `/jobs`: List | Suites (`GET /jobs/suites`) | History (filters on `GET /jobs`) | Trends (`GET /jobs/trends`).
+- Share tokens (`server/auth/report-token.ts`): HS256 JWT scoped per job (`sub: 'job:<uuid>'`), minted via `POST /jobs/:id/share-token`. `?t=<jwt>` middleware in `server/api/plugin.ts` runs at `onRequest` (BEFORE `@fastify/bearer-auth`) to bypass auth on a small allowlist of viewer routes.
+- Step timestamps come from `MaestroParser` wallclock map merged with Maestro's `commands-*.json` overrides (when available). `artifacts.video_started_at` lets the viewer derive per-step video offsets.
+- OS / Maestro versions captured at job runtime via `adb getprop`/`xcrun simctl` and `maestro --version`, persisted in `jobs.metadata`. Legacy jobs fall back to the server's current Maestro version and config-derived OS version (`api_level` → Android marketing version, `runtime: iOS-18-5` → `iOS 18.5`).
+
 ### Device State Machine
 Devices follow strict state transitions validated by `VALID_TRANSITIONS` in `server/types/index.ts`:
 ```
@@ -82,5 +96,12 @@ Platform-specific drivers (Android `emulator.ts`, iOS `simulator.ts`) implement:
 ## Important Notes
 - **API Level 35** is used (not 36.1) because API 36.1 crashes on macOS Tahoe due to mprotect/hvf issues
 - `pluginTimeout: 120_000` in Fastify config to allow emulator boot during `onReady`
-- Server DB schema: 8 tables defined in `server/db/schema.ts`
+- Server DB schema: see `server/db/schema.ts` (additions in report-viewer rollout: `artifacts.video_started_at` for step↔video sync; `job_steps.started_at/finished_at` now populated from parser wallclock)
 - Web app uses Svelte 5 runes (`$state`, `$derived`, `$effect`) and Tailwind CSS v4
+- New deps from report-viewer rollout: `jose` (HS256 JWT for share tokens)
+- Feature flags in `config.yaml`: `ui.use_report_shell` (default `false`), `sharing.enabled` (requires `security.share_token_secret >= 32 chars` when true)
+
+## Runbooks
+- `docs/runbooks/device-stream.md` — what device-stream is, when to use streaming-only vs hook-control
+- `docs/runbooks/hooks-device-stream.md` — hook lifecycle + recipes for setup/teardown that drive the device through `device-stream`
+- `docs/runbooks/` — other operational guides (drain, github-integration, wireless-android, mcp, session-api, etc.)
