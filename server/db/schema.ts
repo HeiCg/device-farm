@@ -134,6 +134,10 @@ export const artifacts = pgTable('artifacts', {
   compressed: boolean('compressed').notNull().default(false),
   compressedAt: timestamp('compressed_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // NEW — Phase 1: populated only when type='video', null otherwise.
+  // Wall-clock instant when the screen recording actually started, used to
+  // derive per-step offsets in the report viewer.
+  videoStartedAt: timestamp('video_started_at', { withTimezone: true }),
 }, (table) => [
   index('artifacts_job_id_idx').on(table.jobId),
   index('artifacts_created_at_idx').on(table.createdAt),
