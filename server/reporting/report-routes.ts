@@ -2,6 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import type { FastifyZodOpenApiTypeProvider, FastifyZodOpenApiSchema } from 'fastify-zod-openapi';
 import { z } from 'zod';
 import { eq, desc, and, gte, isNotNull } from 'drizzle-orm';
+import { execFile as nodeExecFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { generateJUnitXML } from './junit-generator.js';
 import { createHttpError } from '../api/error-handler.js';
 import { webhookCreateRequestSchema, webhookSchema } from './schemas.js';
@@ -140,6 +142,11 @@ export async function reportRoutes(fastify: FastifyInstance): Promise<void> {
 
     const jobMeta = (jobRow.metadata as { maestroVersion?: string; osVersion?: string } | null) ?? null;
 
+    // Fallback: derive OS / Maestro version from current server state when
+    // metadata is empty (legacy jobs that ran before per-job capture shipped).
+    const maestroVersion = jobMeta?.maestroVersion ?? cachedServerMaestroVersion ?? null;
+    const osVersion = jobMeta?.osVersion ?? deriveOsVersionFromConfig(fastify, jobRow.platform);
+
     return buildReportBundle({
       job: {
         id: jobRow.id,
@@ -150,8 +157,8 @@ export async function reportRoutes(fastify: FastifyInstance): Promise<void> {
         finishedAt: jobRow.finishedAt ?? null,
         deviceId: jobRow.deviceId ?? null,
         metadata: jobRow.metadata,
-        maestroVersion: jobMeta?.maestroVersion ?? null,
-        osVersion: jobMeta?.osVersion ?? null,
+        maestroVersion,
+        osVersion,
       },
       steps: stepRows.map<ReportStep>((s) => ({
         id: s.id,
@@ -331,4 +338,60 @@ async function loadFlowHistory(
     passRate: passed / rows.length,
     avgDurationMs: avg,
   };
+}
+
+// ── version fallback helpers ──────────────────────────────────────────────────
+
+const pExecFile = promisify(nodeExecFile);
+
+/**
+ * Cached Maestro version detected on the running server. Surfaced as a
+ * fallback for legacy jobs whose metadata lacks maestroVersion. Resolved
+ * lazily on first /jobs/:id/report call.
+ */
+let cachedServerMaestroVersion: string | null | undefined = undefined;
+
+async function ensureServerMaestroVersion(): Promise<void> {
+  if (cachedServerMaestroVersion !== undefined) return;
+  try {
+    const { stdout } = await pExecFile('maestro', ['--version']);
+    cachedServerMaestroVersion = stdout.trim().split('\n')[0] || null;
+  } catch {
+    cachedServerMaestroVersion = null;
+  }
+}
+
+// fire-and-forget warmup on module load
+void ensureServerMaestroVersion();
+
+// Android API level → marketing version mapping. Truncated at API 26 (8.0).
+const ANDROID_API_TO_VERSION: Record<string, string> = {
+  '35': '15',
+  '34': '14',
+  '33': '13',
+  '32': '12L',
+  '31': '12',
+  '30': '11',
+  '29': '10',
+  '28': '9',
+  '27': '8.1',
+  '26': '8.0',
+};
+
+function deriveOsVersionFromConfig(fastify: FastifyInstance, platform: 'android' | 'ios'): string | null {
+  const cfg = (fastify as unknown as { config?: { pool?: { android?: { api_level?: string | number }; ios?: { runtime?: string } } } }).config;
+  if (!cfg?.pool) return null;
+  if (platform === 'android') {
+    const api = String(cfg.pool.android?.api_level ?? '');
+    const v = ANDROID_API_TO_VERSION[api];
+    return v ? `Android ${v}` : api ? `API ${api}` : null;
+  }
+  if (platform === 'ios') {
+    const runtime = cfg.pool.ios?.runtime ?? '';
+    // "iOS-18-5" → "iOS 18.5"
+    const m = runtime.match(/^iOS-(\d+)-(\d+)$/);
+    if (m) return `iOS ${m[1]}.${m[2]}`;
+    return runtime || null;
+  }
+  return null;
 }
