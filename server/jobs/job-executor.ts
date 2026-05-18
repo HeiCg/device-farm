@@ -165,6 +165,13 @@ export class JobExecutor {
       args.push('--output', join(opts.outputDir, 'report.xml'));
     }
 
+    // commands-*.json + screenshots land here when test-output-dir is set.
+    // Phase 1 (report viewer): we read commands-*.json post-run to override
+    // wallclock timestamps with Maestro's own when available.
+    if (opts.outputDir) {
+      args.push('--test-output-dir', opts.outputDir);
+    }
+
     // Build env
     const env: Record<string, string> = { ...process.env as Record<string, string> };
     if (platform === 'android') {
