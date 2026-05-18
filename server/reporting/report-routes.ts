@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import type { FastifyZodOpenApiTypeProvider, FastifyZodOpenApiSchema } from 'fastify-zod-openapi';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { generateJUnitXML } from './junit-generator.js';
 import { createHttpError } from '../api/error-handler.js';
 import { webhookCreateRequestSchema, webhookSchema } from './schemas.js';
 import * as schema from '../db/schema.js';
+import { buildReportBundle, type ReportStep } from './report-bundle-service.js';
 
 export async function reportRoutes(fastify: FastifyInstance): Promise<void> {
   /**
@@ -89,4 +90,134 @@ export async function reportRoutes(fastify: FastifyInstance): Promise<void> {
     const flaky = await fastify.flakyDetector.getFlaky(windowSize);
     return flaky;
   });
+
+  /**
+   * GET /jobs/:id/report - Full report viewer bundle for a job.
+   *
+   * Queries job + steps + artifacts from DB, builds the log tail from
+   * jobs.maestroOutput, loads flow history for the first flow seen in steps,
+   * then delegates to buildReportBundle (pure transformer, Task 2.1).
+   *
+   * Returns the ReportBundle shape directly — no Zod schema wrapping needed
+   * here (plain JSON output, matching the existing report-routes style).
+   */
+  fastify.get<{ Params: { id: string } }>('/jobs/:id/report', async (request, reply) => {
+    const { id } = request.params;
+
+    const [jobRow] = await fastify.db
+      .select()
+      .from(schema.jobs)
+      .where(eq(schema.jobs.id, id));
+
+    if (!jobRow) {
+      throw createHttpError(404, `Job ${id} not found`, 'NOT_FOUND');
+    }
+
+    const stepRows = await fastify.db
+      .select()
+      .from(schema.jobSteps)
+      .where(eq(schema.jobSteps.jobId, id))
+      .orderBy(schema.jobSteps.stepIndex);
+
+    const artifactRows = await fastify.db
+      .select()
+      .from(schema.artifacts)
+      .where(eq(schema.artifacts.jobId, id));
+
+    const logTailLines = buildLogTail(jobRow.maestroOutput ?? '', 30);
+
+    const firstFlow = stepRows.find((s) => s.flowName)?.flowName ?? null;
+    const history = firstFlow ? await loadFlowHistory(fastify, firstFlow, 10) : null;
+
+    return buildReportBundle({
+      job: {
+        id: jobRow.id,
+        status: jobRow.status,
+        platform: jobRow.platform,
+        createdAt: jobRow.createdAt,
+        startedAt: jobRow.startedAt ?? null,
+        finishedAt: jobRow.finishedAt ?? null,
+        deviceId: jobRow.deviceId ?? null,
+        metadata: jobRow.metadata,
+      },
+      steps: stepRows.map<ReportStep>((s) => ({
+        id: s.id,
+        jobId: s.jobId,
+        stepIndex: s.stepIndex,
+        flowName: s.flowName ?? null,
+        command: s.command ?? null,
+        status: s.status,
+        durationMs: s.durationMs ?? null,
+        startedAt: s.startedAt ?? null,
+        finishedAt: s.finishedAt ?? null,
+        error: s.error ?? null,
+        screenshotPath: s.screenshotPath ?? null,
+      })),
+      artifacts: artifactRows.map((a) => ({
+        id: a.id,
+        type: a.type,
+        fileName: a.fileName,
+        mimeType: a.mimeType,
+        fileSizeBytes: a.fileSizeBytes ?? null,
+        videoStartedAt: a.videoStartedAt ?? null,
+      })),
+      logTailLines,
+      history,
+    });
+
+    void reply; // reply is unused — Fastify serialises the return value
+  });
+}
+
+// ── module-scope helpers ──────────────────────────────────────────────────────
+
+/**
+ * Return the last `n` non-empty lines from a raw maestro output string.
+ * An empty maestroOutput yields an empty array.
+ */
+function buildLogTail(maestroOutput: string, n: number): string[] {
+  if (!maestroOutput) return [];
+  const lines = maestroOutput.split('\n');
+  return lines.slice(Math.max(0, lines.length - n));
+}
+
+/**
+ * Query the last `n` runs of a given flow from jobSteps and compute
+ * aggregate stats.  Returns null if no rows are found.
+ */
+async function loadFlowHistory(
+  fastify: FastifyInstance,
+  flowName: string,
+  n: number,
+) {
+  const rows = await fastify.db
+    .select({
+      jobId: schema.jobSteps.jobId,
+      status: schema.jobSteps.status,
+      finishedAt: schema.jobSteps.finishedAt,
+      durationMs: schema.jobSteps.durationMs,
+    })
+    .from(schema.jobSteps)
+    .where(eq(schema.jobSteps.flowName, flowName))
+    .orderBy(desc(schema.jobSteps.startedAt))
+    .limit(n);
+
+  if (rows.length === 0) return null;
+
+  const passed = rows.filter((r) => r.status === 'passed').length;
+  const avg = Math.round(
+    rows.reduce((s, r) => s + (r.durationMs ?? 0), 0) / rows.length,
+  );
+
+  return {
+    flowName,
+    runs: rows.map((r) => ({
+      jobId: r.jobId,
+      status: r.status,
+      finishedAt: r.finishedAt ?? null,
+      durationMs: r.durationMs ?? null,
+    })),
+    passRate: passed / rows.length,
+    avgDurationMs: avg,
+  };
 }
