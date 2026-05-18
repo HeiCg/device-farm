@@ -309,6 +309,82 @@ describe('GET /api/jobs', () => {
 
     expect(res.statusCode).toBe(200);
   });
+
+  it('filters by dateFrom and dateTo', async () => {
+    const db = {
+      select: vi.fn().mockReturnThis(),
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([]),
+    };
+    const { app } = await buildTestApp({ db: db as any });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/jobs?dateFrom=2026-01-01&dateTo=2026-12-31',
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = res.json();
+    expect(json.data).toHaveLength(0);
+  });
+
+  it('filters by flowName', async () => {
+    const db = {
+      select: vi.fn().mockReturnThis(),
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([]),
+    };
+    const { app } = await buildTestApp({ db: db as any });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/jobs?flowName=login',
+    });
+
+    expect(res.statusCode).toBe(200);
+    const json = res.json();
+    expect(json.data).toHaveLength(0);
+  });
+
+  it('accepts all three new filters combined with existing filters', async () => {
+    const db = {
+      select: vi.fn().mockReturnThis(),
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([]),
+    };
+    const { app } = await buildTestApp({ db: db as any });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/jobs?status=passed&platform=android&flowName=login&dateFrom=2026-01-01&dateTo=2026-12-31',
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('rejects invalid status with 400', async () => {
+    const db = {
+      select: vi.fn().mockReturnThis(),
+      from: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([]),
+    };
+    const { app } = await buildTestApp({ db: db as any });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/jobs?status=bogus',
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
 });
 
 describe('GET /api/jobs/:id', () => {

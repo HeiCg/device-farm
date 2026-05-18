@@ -5,7 +5,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { FastifyZodOpenApiTypeProvider, FastifyZodOpenApiSchema } from 'fastify-zod-openapi';
 import { z } from 'zod';
 import yaml from 'js-yaml';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, gte, lte, sql } from 'drizzle-orm';
 import * as schema from '../db/schema.js';
 import { createHttpError } from './error-handler.js';
 import { listJobsQuerySchema } from './validation.js';
@@ -186,8 +186,12 @@ export async function jobRoutes(fastify: FastifyInstance): Promise<void> {
    */
   fastify.get('/jobs', async (request: FastifyRequest, reply: FastifyReply) => {
     const rawQuery = request.query as Record<string, string>;
-    const parsed = listJobsQuerySchema.parse(rawQuery);
-    const { cursor, limit, status, platform } = parsed;
+    const parseResult = listJobsQuerySchema.safeParse(rawQuery);
+    if (!parseResult.success) {
+      throw createHttpError(400, parseResult.error.issues.map((i) => i.message).join('; '), 'VALIDATION_ERROR');
+    }
+    const parsed = parseResult.data;
+    const { cursor, limit, status, platform, flowName, dateFrom, dateTo } = parsed;
 
     // Build WHERE conditions
     const conditions: any[] = [];
@@ -197,6 +201,17 @@ export async function jobRoutes(fastify: FastifyInstance): Promise<void> {
     }
     if (platform) {
       conditions.push(eq(schema.jobs.platform, platform));
+    }
+    if (dateFrom) {
+      conditions.push(gte(schema.jobs.createdAt, new Date(dateFrom)));
+    }
+    if (dateTo) {
+      conditions.push(lte(schema.jobs.createdAt, new Date(dateTo)));
+    }
+    if (flowName) {
+      conditions.push(
+        sql`${schema.jobs.id} IN (SELECT DISTINCT ${schema.jobSteps.jobId} FROM ${schema.jobSteps} WHERE ${schema.jobSteps.flowName} = ${flowName})`,
+      );
     }
 
     // Metadata filters

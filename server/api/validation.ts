@@ -11,6 +11,9 @@ export const listJobsQuerySchema = z.object({
     .enum(['queued', 'running', 'passed', 'failed', 'cancelled', 'timeout'])
     .optional(),
   platform: z.enum(['android', 'ios']).optional(),
+  flowName: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
 });
 
 export type ListJobsQuery = z.infer<typeof listJobsQuerySchema>;
