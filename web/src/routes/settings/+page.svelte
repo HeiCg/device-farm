@@ -145,6 +145,29 @@
 		showForm = true;
 		formError = null;
 	}
+
+	// --- Artifact retention state ---
+	let retentionDays = $state<5 | 15 | 30>(30);
+	let retentionSaving = $state(false);
+	let retentionSavedAt = $state<Date | null>(null);
+	let retentionError = $state<string | null>(null);
+
+	async function saveRetention() {
+		retentionSaving = true;
+		retentionError = null;
+		try {
+			await apiFetch('/admin/config', {
+				method: 'PATCH',
+				body: JSON.stringify({ retention_days: retentionDays }),
+				headers: { 'Content-Type': 'application/json' },
+			});
+			retentionSavedAt = new Date();
+		} catch (e) {
+			retentionError = e instanceof Error ? e.message : 'Failed to save';
+		} finally {
+			retentionSaving = false;
+		}
+	}
 </script>
 
 <div>
@@ -349,5 +372,35 @@
 				<SecretManager />
 			</section>
 		</div>
+
+		<!-- Artifact Retention -->
+		<section class="rounded-lg border border-outline-variant/10 p-4 mt-6">
+			<h2 class="text-[14px] font-semibold mb-2">Artifact retention</h2>
+			<p class="text-[12px] text-on-surface-variant mb-3">
+				Delete artifacts (videos, screenshots) older than the selected window. A restart is required to apply.
+			</p>
+			<label class="flex items-center gap-2 text-[13px]">
+				<span>Days</span>
+				<select bind:value={retentionDays} class="rounded border border-outline-variant/30 px-2 py-1">
+					<option value={5}>5</option>
+					<option value={15}>15</option>
+					<option value={30}>30</option>
+				</select>
+			</label>
+			<button
+				type="button"
+				onclick={saveRetention}
+				disabled={retentionSaving}
+				class="mt-3 rounded bg-primary text-on-primary px-3 py-1.5 text-[13px] disabled:opacity-50"
+			>
+				{retentionSaving ? 'Saving…' : 'Save'}
+			</button>
+			{#if retentionSavedAt}
+				<div class="mt-2 text-[12px] text-on-surface-variant">Saved at {retentionSavedAt.toLocaleTimeString()} · restart server to apply</div>
+			{/if}
+			{#if retentionError}
+				<div class="mt-2 text-tertiary text-[12px]">{retentionError}</div>
+			{/if}
+		</section>
 	{/if}
 </div>
