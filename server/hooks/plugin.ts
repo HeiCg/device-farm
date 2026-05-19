@@ -144,9 +144,9 @@ async function hooksPlugin(fastify: FastifyInstance): Promise<void> {
     },
   );
 
-  fastify.post<{ Params: { name: string }; Body: { deviceId?: string } }>(
+  fastify.post<{ Params: { name: string }; Body: { deviceId?: string; vars?: Record<string, unknown> } }>(
     '/api/hooks/:name/test',
-    async (request: FastifyRequest<{ Params: { name: string }; Body: { deviceId?: string } }>, reply: FastifyReply) => {
+    async (request: FastifyRequest<{ Params: { name: string }; Body: { deviceId?: string; vars?: Record<string, unknown> } }>, reply: FastifyReply) => {
       const { name } = request.params;
       const hook = executor.getHooks().find(h => h.name === name);
       if (!hook) {
@@ -157,7 +157,7 @@ async function hooksPlugin(fastify: FastifyInstance): Promise<void> {
           detail: `No hook named "${name}" found`,
         });
       }
-      const body = (request.body ?? {}) as { deviceId?: string };
+      const body = (request.body ?? {}) as { deviceId?: string; vars?: Record<string, unknown> };
       let context;
       if (body.deviceId) {
         const device = fastify.pool.getDevice(body.deviceId);
@@ -175,6 +175,7 @@ async function hooksPlugin(fastify: FastifyInstance): Promise<void> {
           platform: device.platform,
           port: device.port,
           jobId: 'test-run',
+          vars: body.vars,
         };
       } else {
         context = {
@@ -184,6 +185,7 @@ async function hooksPlugin(fastify: FastifyInstance): Promise<void> {
           platform: 'android' as const,
           port: 5554,
           jobId: 'test-run',
+          vars: body.vars,
         };
       }
       const [result] = await executor.execute(hook.event, context);

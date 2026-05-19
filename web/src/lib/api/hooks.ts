@@ -58,9 +58,15 @@ export async function deleteHook(name: string): Promise<{ status: string; name: 
  * @param name — hook name to test
  * @param deviceId — optional real device ID (uses test context if omitted)
  */
-export async function testHook(name: string, deviceId?: string): Promise<HookResult> {
+export async function testHook(
+	name: string,
+	opts?: { deviceId?: string; vars?: Record<string, unknown> }
+): Promise<HookResult> {
+	const body: Record<string, unknown> = {};
+	if (opts?.deviceId) body.deviceId = opts.deviceId;
+	if (opts?.vars) body.vars = opts.vars;
 	return apiFetch<HookResult>(`/api/hooks/${encodeURIComponent(name)}/test`, {
 		method: 'POST',
-		body: JSON.stringify(deviceId ? { deviceId } : {})
+		body: JSON.stringify(body)
 	});
 }

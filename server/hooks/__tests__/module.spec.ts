@@ -70,6 +70,7 @@ describe('createHooksModule (Phase 16-02)', () => {
         {
           name: 'h1',
           event: 'device.booted',
+          kind: 'shell',
           command: 'echo',
           platform: 'all',
           timeoutMs: 30_000,

@@ -1,6 +1,11 @@
 # Lifecycle Hooks & Device Control
 
-Device Farm runs user-defined shell commands at well-defined lifecycle points around every job. Use these hooks to prepare the device (install an APK, clear caches, set a permission) before a test starts and to clean up afterwards. The hook command is just a shell command — anything available on `$PATH` works, including the `device-stream` package's CLI binaries and direct `adb` / `xcrun simctl` calls.
+Device Farm runs user-defined commands at well-defined lifecycle points around every job. Use these hooks to prepare the device (install an APK, clear caches, set a permission) before a test starts and to clean up afterwards.
+
+Hooks come in two flavours:
+
+- **`kind: 'shell'`** (this runbook) — a `/bin/sh -c` command with `{{template}}` interpolation. Lightest weight; ideal for one-shot `adb` / `xcrun simctl` calls or a tsx one-liner.
+- **`kind: 'script'`** — a TypeScript snippet executed under `tsx` with `@device-stream/dsl` pre-bound. Selector-based interactions, multi-step flows, cross-platform. **See [`dsl-hooks.md`](./dsl-hooks.md) for the full reference** and Section 3 below for when to pick which.
 
 This runbook covers:
 
@@ -65,9 +70,13 @@ curl -X POST http://localhost:3000/api/hooks/install-apk/test \
 |---|---|---|---|
 | `name` | string (1–255) | — | Unique. Used as the `singletonKey` suffix on `hook.run`. |
 | `event` | enum | — | `device.booted` \| `device.shutdown` \| `test.before` \| `test.after` |
-| `command` | string (1–4096) | — | Any shell command. Runs in the server's working directory, server environment. |
+| `kind` | enum | `'shell'` | `'shell'` \| `'script'`. Discriminates payload. See [`dsl-hooks.md`](./dsl-hooks.md) for `'script'`. |
+| `command` | string (1–4096) | — | **shell hooks only.** Any shell command. Runs in the server's working directory, server environment. |
+| `script` | string (1–64000) | — | **script hooks only.** TS source for the DSL runner. |
+| `vars` | object | — | **script hooks only.** Default vars merged with `context.vars` at runtime. |
+| `iosKind` | enum | — | **script hooks only.** `'simulator'` \| `'device'` — picks simctl vs go-ios on iOS. |
 | `platform` | enum | `all` | `android` \| `ios` \| `all` — skips when context platform doesn't match. |
-| `timeoutMs` | int (1000–300000) | `30000` | Hook process is killed past this. |
+| `timeoutMs` | int (1000–300000) | `30000` | Hook process is killed past this. Raise for script hooks (tsx boot ~1–2s). |
 | `failOnError` | bool | `false` | If `true`, non-zero exit halts the chain *and* fails the job. |
 | `enabled` | bool | `true` | Quick toggle without deleting. |
 
@@ -288,4 +297,7 @@ If a hook with `failOnError: true` fails, the job moves to `failed` with `errorM
 - Module overview: `server/hooks/MODULE.md`
 - device-stream binaries: `device-stream/bin/`
 - device-stream node API: `device-stream/packages/{android,ios-simulator,ios-device}/`
+- DSL package (for `kind: 'script'` hooks): `device-stream/packages/dsl/`
+- Script-hook runner: `server/hooks/internal/script-runner.ts`
+- Script-hook authoring guide: [`dsl-hooks.md`](./dsl-hooks.md)
 - Retention behaviour for hook-generated artifacts: `docs/runbooks/drain.md` and `server/lifecycle/retention-task.ts`

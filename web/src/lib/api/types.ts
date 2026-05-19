@@ -173,14 +173,25 @@ export interface QueryResult {
 /** Lifecycle event that triggers a hook */
 export type HookEvent = 'device.booted' | 'device.shutdown' | 'test.before' | 'test.after';
 
+/** Hook payload kind. `shell` runs a /bin/sh command; `script` runs a TS snippet via @device-stream/dsl. */
+export type HookKind = 'shell' | 'script';
+
 /** A configured lifecycle hook */
 export interface HookDefinition {
 	/** Unique name for this hook */
 	name: string;
 	/** Which lifecycle event triggers this hook */
 	event: HookEvent;
-	/** Shell command to execute. Supports {{variable}} templates. */
-	command: string;
+	/** Payload kind. Defaults to 'shell' for back-compat. */
+	kind: HookKind;
+	/** Shell command to execute (kind=shell only). Supports {{variable}} templates. */
+	command?: string;
+	/** TS snippet body (kind=script only). Has `ds`, `vars`, `ctx` in scope. */
+	script?: string;
+	/** Default vars merged with per-invocation context.vars (script hooks). */
+	vars?: Record<string, unknown>;
+	/** iOS only — selects between simctl and go-ios paths (defaults 'simulator' in driver). */
+	iosKind?: 'simulator' | 'device';
 	/** Platform filter: 'android', 'ios', or 'all' */
 	platform: 'android' | 'ios' | 'all';
 	/** Timeout in ms */

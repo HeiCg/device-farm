@@ -57,8 +57,17 @@ Plugins must register in dependency order. Each declares `{ dependencies: ['...'
 ### device-stream Monorepo (`device-stream/`)
 In-repo npm workspaces (`@device-stream/*`) plus native binaries that handle device control + streaming. The `streaming/` and `sessions/` modules consume the packages; **lifecycle hooks** can also invoke them via tsx scripts (see `docs/runbooks/device-stream.md` and `docs/runbooks/hooks-device-stream.md`). Per-device `DeviceMutexManager` (in `@device-stream/core`) serialises commands across streams, sessions, and hook-triggered scripts so they don't fight each other.
 
+**`@device-stream/dsl`** (`device-stream/packages/dsl/`) — high-level selector + orchestration DSL on top of `@device-stream/android-server` (HTTP :9008), WDA (iOS :8100), `adb`, `xcrun simctl`, `go-ios`. Single API (`ds.get({ id }).fill(...)`, `ds.installApp(...)`, `ds.grantPermissions(...)`, `ds.awaitUntil(...).changeTo(...)`) that runs on Android emulators, iOS Simulators, and (most verbs) iOS physical devices. `iosKind: 'simulator' | 'device'` selects between simctl and go-ios. Android-only verbs (`grantPermissions`, `enableInstallByThirdParty`, `openDownloads`) throw `NotSupportedOnPlatformError` on iOS. Used by `kind: 'script'` hooks via the runner; the web Hook editor at `/settings` loads its `.d.ts` into Monaco for typed autocomplete. See `device-stream/packages/dsl/README.md` and `docs/runbooks/dsl-hooks.md`.
+
 ### Lifecycle Hooks (`server/hooks/`)
-User-defined shell commands triggered at 4 events: `device.booted`, `device.shutdown`, `test.before`, `test.after`. Setup/teardown for jobs lives here. Commands accept `{{serial}}`, `{{platform}}`, `{{job_id}}`, `{{device_id}}`, `{{emulator_id}}`, `{{port}}` template variables. Sequential per event, retry-safe via `hook_runs.operation_key`. Managed at `/api/hooks` (CRUD + `/test`).
+User-defined hooks triggered at 4 events: `device.booted`, `device.shutdown`, `test.before`, `test.after`. Setup/teardown for jobs lives here. Sequential per event, retry-safe via `hook_runs.operation_key`. Managed at `/api/hooks` (CRUD + `/test`).
+
+Two `kind`s, discriminated by the Zod schema in `server/hooks/schemas.ts`:
+
+- **`kind: 'shell'`** (legacy default) — `command` is interpolated with `{{serial}}`, `{{platform}}`, `{{job_id}}`, `{{device_id}}`, `{{emulator_id}}`, `{{port}}` template variables and run via `/bin/sh -c`. Per-invocation `context.vars` are also exposed as `DEVICE_FARM_VAR_<KEY>` env vars + `DEVICE_FARM_VARS_JSON`.
+- **`kind: 'script'`** — `script` is a TypeScript snippet executed by `server/hooks/internal/script-runner.ts`. The runner writes a temp `.mts` under `<projectRoot>/.df-hook-tmp/`, wraps the body with a prelude that injects a `@device-stream/dsl` session (`ds`), the merged `vars` (definition `vars` ← `context.vars`, context wins), and `ctx` (full `HookContext`). Each `vars` key that's a valid JS identifier is also destructured into scope. `iosKind: 'simulator' | 'device'` picks the iOS backend. Runs via local `node_modules/.bin/tsx` (falls back to `npx --yes tsx`).
+
+See `docs/runbooks/hooks-device-stream.md` (shell) and `docs/runbooks/dsl-hooks.md` (script).
 
 ### Report Viewer
 - `/jobs/[id]` switches to a 3-pane `ReportShell` (tree | step detail | video/history) behind the `ui.use_report_shell` config flag. Legacy `LegacyJobView.svelte` preserves the rollback path.
@@ -103,5 +112,7 @@ Platform-specific drivers (Android `emulator.ts`, iOS `simulator.ts`) implement:
 
 ## Runbooks
 - `docs/runbooks/device-stream.md` — what device-stream is, when to use streaming-only vs hook-control
-- `docs/runbooks/hooks-device-stream.md` — hook lifecycle + recipes for setup/teardown that drive the device through `device-stream`
+- `docs/runbooks/hooks-device-stream.md` — shell hooks (`kind: 'shell'`) lifecycle + recipes for setup/teardown
+- `docs/runbooks/dsl-hooks.md` — DSL script hooks (`kind: 'script'`) authoring guide, schema, scope, examples
+- `device-stream/packages/dsl/README.md` — `@device-stream/dsl` API reference (Selector, ElementHandle, WaitHandle, per-verb backend mapping)
 - `docs/runbooks/` — other operational guides (drain, github-integration, wireless-android, mcp, session-api, etc.)

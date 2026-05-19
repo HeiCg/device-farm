@@ -42,11 +42,20 @@ export interface HookContext {
   platform: Platform;
   port: number | null;
   jobId?: string;
+  /**
+   * Per-invocation key/value bag from the trigger source (e.g. a parsed Azure DevOps
+   * `device-script` block, a job submission, or a manual `/api/hooks/:name/test` call).
+   * For `kind: 'script'` hooks these are merged on top of the hook definition's own
+   * `vars` (context wins). For `kind: 'shell'` hooks they are exposed as
+   * `DEVICE_FARM_VAR_<KEY>` env vars when the key is a valid identifier.
+   */
+  vars?: Record<string, unknown>;
 }
 
 export interface HookResult {
   hookName: string;
   event: HookEvent;
+  /** For shell hooks: the interpolated shell command. For script hooks: a short tag like `script:<name>`. */
   command: string;
   exitCode: number | null;
   stdout: string;
@@ -146,17 +155,21 @@ export class HookExecutor {
   }
 
   /**
-   * Execute a single hook command.
+   * Execute a single hook (shell command or DSL script).
    */
   private async executeOne(hook: HookDefinition, context: HookContext): Promise<HookResult> {
-    const command = this.interpolate(hook.command, context);
     const timeout = hook.timeoutMs || DEFAULT_TIMEOUT_MS;
     const start = Date.now();
+
+    if (hook.kind === 'script') {
+      return this.executeScript(hook, context, timeout, start);
+    }
+
+    const command = this.interpolate(hook.command ?? '', context);
 
     this.logger.debug({ hookName: hook.name, command, timeout }, 'Running hook');
 
     try {
-      // Split command into shell execution via /bin/sh -c
       const { stdout, stderr } = await execFileAsync(
         '/bin/sh', ['-c', command],
         { timeout, env: this.buildEnv(context) },
@@ -174,7 +187,7 @@ export class HookExecutor {
         event: hook.event,
         command,
         exitCode: 0,
-        stdout: stdout.substring(0, 10_000), // Cap output
+        stdout: stdout.substring(0, 10_000),
         stderr: stderr.substring(0, 10_000),
         durationMs,
         success: true,
@@ -202,6 +215,65 @@ export class HookExecutor {
     }
   }
 
+  private async executeScript(
+    hook: HookDefinition,
+    context: HookContext,
+    timeout: number,
+    start: number,
+  ): Promise<HookResult> {
+    const tag = `script:${hook.name}`;
+    this.logger.debug({ hookName: hook.name, timeout }, 'Running DSL script hook');
+
+    try {
+      const { runScriptHook } = await import('./script-runner.js');
+      const mergedVars = { ...(hook.vars ?? {}), ...(context.vars ?? {}) };
+      const { stdout, stderr } = await runScriptHook({
+        script: hook.script ?? '',
+        vars: mergedVars,
+        iosKind: hook.iosKind,
+        context,
+        timeoutMs: timeout,
+      });
+      const durationMs = Date.now() - start;
+
+      this.logger.info(
+        { hookName: hook.name, durationMs, exitCode: 0 },
+        'Script hook completed successfully',
+      );
+
+      return {
+        hookName: hook.name,
+        event: hook.event,
+        command: tag,
+        exitCode: 0,
+        stdout: stdout.substring(0, 10_000),
+        stderr: stderr.substring(0, 10_000),
+        durationMs,
+        success: true,
+      };
+    } catch (err: any) {
+      const durationMs = Date.now() - start;
+      const exitCode = err.code ?? null;
+
+      this.logger.warn(
+        { hookName: hook.name, durationMs, exitCode, error: err.message },
+        'Script hook failed',
+      );
+
+      return {
+        hookName: hook.name,
+        event: hook.event,
+        command: tag,
+        exitCode: typeof exitCode === 'number' ? exitCode : null,
+        stdout: (err.stdout ?? '').substring(0, 10_000),
+        stderr: (err.stderr ?? err.message ?? '').substring(0, 10_000),
+        durationMs,
+        success: false,
+        error: err.message,
+      };
+    }
+  }
+
   /**
    * Replace {{variable}} placeholders in a command string.
    */
@@ -218,9 +290,15 @@ export class HookExecutor {
   /**
    * Build environment variables for hook subprocess.
    * Provides all context values as DEVICE_FARM_* env vars.
+   *
+   * Per-invocation `vars` are exposed as `DEVICE_FARM_VAR_<KEY>` for any key
+   * whose name is a valid identifier (matches /^[A-Z][A-Z0-9_]*$/i after
+   * upper-casing). Non-identifier keys are skipped so the env var name stays
+   * shell-safe. The full vars bag is also serialised into
+   * `DEVICE_FARM_VARS_JSON` for shell hooks that want to `jq` the lot.
    */
   private buildEnv(context: HookContext): Record<string, string> {
-    return {
+    const base: Record<string, string> = {
       ...process.env as Record<string, string>,
       DEVICE_FARM_DEVICE_ID: context.deviceId,
       DEVICE_FARM_EMULATOR_ID: context.emulatorId,
@@ -229,6 +307,15 @@ export class HookExecutor {
       DEVICE_FARM_PORT: String(context.port ?? ''),
       DEVICE_FARM_JOB_ID: context.jobId ?? '',
     };
+    if (context.vars) {
+      base.DEVICE_FARM_VARS_JSON = JSON.stringify(context.vars);
+      for (const [k, v] of Object.entries(context.vars)) {
+        if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(k)) {
+          base[`DEVICE_FARM_VAR_${k.toUpperCase()}`] = typeof v === 'string' ? v : JSON.stringify(v);
+        }
+      }
+    }
+    return base;
   }
 }
 

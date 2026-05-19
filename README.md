@@ -5,7 +5,11 @@ Self-hosted test execution platform for Apple Silicon Mac Minis. Manages Android
 **Highlights**
 - 🎬 **Report viewer** — ReportPortal-style 3-pane viewer at `/jobs/[id]`: step timeline with screenshots, video sync (click a step → video seeks), failure focus panel with log tail + jump-to-video, suite/history/trends sub-tabs, device + OS + Maestro version chips. Enable with `ui.use_report_shell: true`.
 - 🔗 **Share links** — Mint per-job signed URLs (`?t=<jwt>`) for reviewers without Device Farm credentials. Plumbed into the Azure DevOps PR commenter.
-- 🪝 **Lifecycle hooks** — `device.booted` / `device.shutdown` / `test.before` / `test.after` with template variables and timeout. Wrap `adb`, `simctl`, or scripts on top of `device-stream` to install/clear/grant/dump around every job. See [`docs/runbooks/hooks-device-stream.md`](./docs/runbooks/hooks-device-stream.md).
+- 🪝 **Lifecycle hooks (two flavours)** —
+  - `kind: 'shell'` — interpolated `{{template}}` commands; thin wrappers around `adb` / `simctl`. See [`docs/runbooks/hooks-device-stream.md`](./docs/runbooks/hooks-device-stream.md).
+  - `kind: 'script'` — TypeScript snippets with `@device-stream/dsl` pre-bound; selector-based (`ds.get({ id: 'username' }).fill(...)`) and cross-platform. See [`docs/runbooks/dsl-hooks.md`](./docs/runbooks/dsl-hooks.md).
+- ✍️ **Monaco editor in `/settings`** — Authors `kind: 'script'` hooks with full TypeScript autocomplete loaded from the DSL's `.d.ts`. Inline diagnostics, parameter hints, `Selector` field completion.
+- 📦 **`@device-stream/dsl`** — High-level DSL on top of `@device-stream/android-server` (HTTP), WDA (iOS), `adb`, `simctl`, and `go-ios`. Single source for `openUrl`, selector-based UI, install / grant / setLocation across Android + iOS Simulator + iOS Device. See [`device-stream/packages/dsl/README.md`](./device-stream/packages/dsl/README.md).
 - 📺 **device-stream** monorepo (`device-stream/`) — TS packages + native binaries for screen streaming (the built-in Live Preview) and programmatic device control (taps/types/screenshots) reusable from hooks. See [`docs/runbooks/device-stream.md`](./docs/runbooks/device-stream.md).
 - 🗑️ **Retention** — Configurable per-artifact retention (5/15/30 days) via `/settings` UI, applied by the `lifecycle` module's daily pg-boss schedule.
 
@@ -408,4 +412,4 @@ brew services start postgresql@17
 
 ## License
 
-Private — internal use only.
+MIT — see [LICENSE](./LICENSE) for details. This is a personal/portfolio project; use at your own risk.

@@ -62,3 +62,6 @@ device-stream/native-servers/android-grpc/bin/
 
 # Chrome DevTools MCP scratch dir (browser smoke screenshots)
 .bg-shell/
+
+# Temp dir for hook script execution (created per-run, removed on completion)
+.df-hook-tmp/

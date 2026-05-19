@@ -99,9 +99,16 @@
 								{hook.platform.toUpperCase()}
 							</span>
 
-							<!-- Command preview -->
+							<!-- Kind badge -->
+							{#if hook.kind === 'script'}
+								<span class="text-[10px] font-headline tracking-widest px-2 py-0.5 rounded border whitespace-nowrap bg-primary/10 text-primary border-primary/20">
+									SCRIPT
+								</span>
+							{/if}
+
+							<!-- Command / script preview -->
 							<span class="text-xs font-mono text-on-surface-variant/70 truncate min-w-0 flex-1 hidden sm:block">
-								{truncateCommand(hook.command)}
+								{truncateCommand(hook.kind === 'script' ? (hook.script ?? '') : (hook.command ?? ''))}
 							</span>
 
 							<!-- Enabled toggle -->

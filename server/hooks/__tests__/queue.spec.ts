@@ -102,6 +102,7 @@ describe.skipIf(!HAS_DB)('hook.run queue worker (Phase 16-01)', () => {
     executor.setHooks([{
       name: hookName,
       event: 'device.booted',
+      kind: 'shell',
       command: 'echo IDEMPOTENT',
       platform: 'all',
       timeoutMs: 30_000,
@@ -174,6 +175,7 @@ describe.skipIf(!HAS_DB)('hook.run queue worker (Phase 16-01)', () => {
     executor.setHooks([{
       name: hookName,
       event: 'device.booted',
+      kind: 'shell',
       command: 'echo BRIDGE',
       platform: 'all',
       timeoutMs: 30_000,

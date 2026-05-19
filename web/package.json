@@ -23,7 +23,9 @@
   },
   "dependencies": {
     "@dagrejs/dagre": "^1.1.8",
+    "@device-stream/dsl": "file:../device-stream/packages/dsl",
     "@xyflow/svelte": "^1.5.2",
-    "fuzzysort": "^3.1.0"
+    "fuzzysort": "^3.1.0",
+    "monaco-editor": "^0.52.0"
   }
 }

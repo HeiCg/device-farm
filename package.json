@@ -8,6 +8,7 @@
     "device-stream/packages/android",
     "device-stream/packages/ios-simulator",
     "device-stream/packages/ios-device",
+    "device-stream/packages/dsl",
     "device-stream/web-sdk",
     "mcp"
   ],
@@ -36,6 +37,7 @@
     "@anthropic-ai/sdk": "^0.96.0",
     "@device-stream/android": "*",
     "@device-stream/core": "*",
+    "@device-stream/dsl": "*",
     "@device-stream/ios-simulator": "*",
     "@fastify/bearer-auth": "^10.1.2",
     "@fastify/multipart": "^9.4.0",
