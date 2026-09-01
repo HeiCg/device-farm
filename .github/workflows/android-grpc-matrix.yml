@@ -38,7 +38,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api-level }}
-          arch: x86_64
+          arch: arm64-v8a   # runner é macos-14-arm64 (Apple Silicon): x86_64 não tem HVF → boot timeout
           target: google_apis_playstore
           force-avd-creation: true
           emulator-options: -no-audio -no-boot-anim -no-window -gpu swiftshader_indirect

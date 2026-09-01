@@ -24,6 +24,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Upgrade npm
+        run: npm i -g npm@latest   # node 22 traz npm 10, que reporta optional @esbuild/* (esbuild 0.28 via tsx) como missing no npm ci; npm 11 corrige
       - name: Install dependencies
         run: npm ci
         env:
