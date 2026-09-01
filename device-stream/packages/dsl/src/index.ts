@@ -1,15 +1,50 @@
 import type {
   Platform,
   Selector,
+  StringMatch,
   UIElement,
   SessionOptions,
   HardwareKey,
   IOSKind,
   IOSPrivacyService,
+  ScrollDirection,
+  SwipeOptions,
+  ScrollOptions,
+  ScreenshotOptions,
+  ScrollUntilVisibleOptions,
 } from './types';
 
-export type { Platform, Selector, UIElement, SessionOptions, HardwareKey, IOSKind, IOSPrivacyService };
+export type {
+  Platform,
+  Selector,
+  StringMatch,
+  UIElement,
+  SessionOptions,
+  HardwareKey,
+  IOSKind,
+  IOSPrivacyService,
+  ScrollDirection,
+  SwipeOptions,
+  ScrollOptions,
+  ScreenshotOptions,
+  ScrollUntilVisibleOptions,
+};
 export { NotSupportedOnPlatformError, ElementNotFoundError } from './types';
+export type { ElementNotFoundDiagnostics } from './types';
+export type { DescribedNode } from './selectors/describe';
+export {
+  serializeFlow,
+  parseFlow,
+  executeFlow,
+  FlowRecorder,
+  type Flow,
+  type FlowStep,
+} from './flow';
+export {
+  runScript,
+  type RunScriptOptions,
+  type RunScriptResult,
+} from './script-runner';
 
 export interface ElementHandle extends PromiseLike<UIElement> {
   fill(text: string): Promise<void>;
@@ -41,8 +76,21 @@ export interface DeviceStreamSession {
 
   awaitUntil(selector: Selector, opts?: { timeoutMs?: number }): WaitHandle;
 
-  screenshot(): Promise<Buffer>;
+  /** Raw swipe in screen coordinates. */
+  swipe(opts: SwipeOptions): Promise<void>;
+  /** Scroll the screen one page in `direction` (content-travel direction). */
+  scroll(direction: ScrollDirection, opts?: ScrollOptions): Promise<void>;
+  /** Scroll until a (visible) element matching `selector` is found, or throw. */
+  scrollUntilVisible(selector: Selector, opts?: ScrollUntilVisibleOptions): Promise<UIElement>;
+  /** Block until the UI stops changing (or `timeoutMs` elapses). */
+  waitForIdle(timeoutMs?: number): Promise<void>;
+
+  screenshot(opts?: ScreenshotOptions): Promise<Buffer>;
   hierarchy(): Promise<UIElement[]>;
+  /** Pruned, normalized, visible-only element tree for agents/debugging. */
+  describe(): Promise<import('./selectors/describe').DescribedNode[]>;
+  /** Same as {@link describe} but rendered as an indented text outline. */
+  describeText(): Promise<string>;
 
   launchApp(packageOrBundleId: string): Promise<void>;
   stopApp(packageOrBundleId: string): Promise<void>;

@@ -5,8 +5,13 @@ import type {
 } from './index';
 import type {
   HardwareKey,
+  ScrollDirection,
   SessionOptions,
   Selector,
+  SwipeOptions,
+  ScrollOptions,
+  ScreenshotOptions,
+  ScrollUntilVisibleOptions,
   UIElement,
 } from './types';
 import { ElementNotFoundError } from './types';
@@ -14,6 +19,12 @@ import type { Driver } from './drivers/types';
 import { AndroidDriver } from './drivers/android';
 import { IOSDriver } from './drivers/ios';
 import { centerOf, elementMatches, findElement } from './selectors/matcher';
+import {
+  buildElementNotFoundDiagnostics,
+  describeElements,
+  renderDescription,
+  type DescribedNode,
+} from './selectors/describe';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_POLL_MS = 250;
@@ -36,7 +47,7 @@ export class DeviceStreamSessionImpl implements DeviceStreamSession {
   async openUrl(url: string): Promise<void> { return this.driver.openUrl(url); }
   async openDownloads(): Promise<void> { return this.driver.openDownloads(); }
   async pressKey(key: HardwareKey): Promise<void> { return this.driver.pressKey(key); }
-  async screenshot(): Promise<Buffer> { return this.driver.screenshot(); }
+  async screenshot(opts?: ScreenshotOptions): Promise<Buffer> { return this.driver.screenshot(opts); }
   async hierarchy(): Promise<UIElement[]> { return this.driver.hierarchy(); }
   async launchApp(id: string): Promise<void> { return this.driver.launchApp(id); }
   async stopApp(id: string): Promise<void> { return this.driver.stopApp(id); }
@@ -58,6 +69,63 @@ export class DeviceStreamSessionImpl implements DeviceStreamSession {
 
   async tapOn(selector: Selector): Promise<void> {
     await this.get(selector).tap();
+  }
+
+  async swipe(opts: SwipeOptions): Promise<void> {
+    await this.driver.swipe(opts.fromX, opts.fromY, opts.toX, opts.toY, opts.durationMs ?? 300);
+  }
+
+  async scroll(direction: ScrollDirection, opts: ScrollOptions = {}): Promise<void> {
+    const { width, height } = await this.driver.screenSize();
+    const distance = clamp01(opts.distance ?? 0.6);
+    const near = 0.5 + distance / 2;
+    const far = 0.5 - distance / 2;
+    const cx = Math.round(width / 2);
+    const cy = Math.round(height / 2);
+    const px = (f: number) => Math.round(f * width);
+    const py = (f: number) => Math.round(f * height);
+    const durationMs = opts.durationMs ?? 300;
+
+    // `direction` is the direction the user wants to travel through content;
+    // the finger moves the opposite way (scroll down => finger swipes up).
+    switch (direction) {
+      case 'down': return this.driver.swipe(cx, py(near), cx, py(far), durationMs);
+      case 'up': return this.driver.swipe(cx, py(far), cx, py(near), durationMs);
+      case 'right': return this.driver.swipe(px(near), cy, px(far), cy, durationMs);
+      case 'left': return this.driver.swipe(px(far), cy, px(near), cy, durationMs);
+    }
+  }
+
+  async waitForIdle(timeoutMs = 2000): Promise<void> {
+    await this.driver.waitForIdle(timeoutMs);
+  }
+
+  async describe(): Promise<DescribedNode[]> {
+    return describeElements(await this.driver.hierarchy());
+  }
+
+  async describeText(): Promise<string> {
+    return renderDescription(describeElements(await this.driver.hierarchy()));
+  }
+
+  async scrollUntilVisible(
+    selector: Selector,
+    opts: ScrollUntilVisibleOptions = {},
+  ): Promise<UIElement> {
+    const direction = opts.direction ?? 'down';
+    const maxScrolls = opts.maxScrolls ?? 10;
+    const visibleSel: Selector = { ...selector, visible: selector.visible ?? true };
+
+    let lastTree: UIElement[] = [];
+    for (let i = 0; i <= maxScrolls; i++) {
+      lastTree = await this.driver.hierarchy();
+      const found = findElement(lastTree, visibleSel);
+      if (found) return found;
+      if (i === maxScrolls) break;
+      await this.scroll(direction, { distance: opts.distance, durationMs: opts.durationMs });
+      await this.driver.waitForIdle(opts.settleTimeoutMs ?? 2000);
+    }
+    throw new ElementNotFoundError(selector, 0, buildElementNotFoundDiagnostics(lastTree, selector));
   }
 
   async copyText(selector: Selector): Promise<string> {
@@ -91,8 +159,14 @@ class ElementHandleImpl implements ElementHandle {
 
   async waitFor(opts?: { timeoutMs?: number }): Promise<UIElement> {
     const timeoutMs = opts?.timeoutMs ?? this.timeoutMs;
-    const el = await waitForElement(this.driver, this.selector, timeoutMs, this.pollIntervalMs);
-    if (!el) throw new ElementNotFoundError(this.selector, timeoutMs);
+    const { el, tree } = await waitForElement(this.driver, this.selector, timeoutMs, this.pollIntervalMs);
+    if (!el) {
+      throw new ElementNotFoundError(
+        this.selector,
+        timeoutMs,
+        buildElementNotFoundDiagnostics(tree, this.selector),
+      );
+    }
     return el;
   }
 
@@ -140,8 +214,14 @@ class WaitHandleImpl implements WaitHandle {
   ) {}
 
   async toAppear(): Promise<void> {
-    const el = await waitForElement(this.driver, this.selector, this.timeoutMs, this.pollIntervalMs);
-    if (!el) throw new ElementNotFoundError(this.selector, this.timeoutMs);
+    const { el, tree } = await waitForElement(this.driver, this.selector, this.timeoutMs, this.pollIntervalMs);
+    if (!el) {
+      throw new ElementNotFoundError(
+        this.selector,
+        this.timeoutMs,
+        buildElementNotFoundDiagnostics(tree, this.selector),
+      );
+    }
   }
 
   async toDisappear(): Promise<void> {
@@ -176,23 +256,29 @@ class WaitHandleImpl implements WaitHandle {
   }
 }
 
+/**
+ * Poll for `selector`, returning the found element (if any) alongside the last
+ * tree polled — so a caller can build not-found diagnostics without an extra
+ * device round-trip.
+ */
 async function waitForElement(
   driver: Driver,
   selector: Selector,
   timeoutMs: number,
   pollIntervalMs: number,
-): Promise<UIElement | undefined> {
+): Promise<{ el: UIElement | undefined; tree: UIElement[] }> {
   let found: UIElement | undefined;
+  let lastTree: UIElement[] = [];
   await pollUntil(
     async () => {
-      const tree = await driver.hierarchy();
-      found = findElement(tree, selector);
+      lastTree = await driver.hierarchy();
+      found = findElement(lastTree, selector);
       return found !== undefined;
     },
     timeoutMs,
     pollIntervalMs,
   );
-  return found;
+  return { el: found, tree: lastTree };
 }
 
 async function pollUntil(
@@ -214,6 +300,10 @@ async function pollUntil(
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function clamp01(n: number): number {
+  return Math.max(0, Math.min(1, n));
 }
 
 export function createDriver(opts: SessionOptions): Driver {

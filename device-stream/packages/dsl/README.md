@@ -8,8 +8,11 @@ Designed to be executed inside device-farm `kind: 'script'` hooks and to power I
 
 The other `@device-stream/*` packages expose **primitives by coordinate** (`tap(x, y)`, `typeText(text)`, raw `/hierarchy` JSON). The DSL adds:
 
-- **Selectors** — find elements by `id`, `text`, `contentDescription`, `className`, `packageName`, `index`. Resolver under the hood: Android `/hierarchy` JSON, iOS WDA `/session/:id/source` XML.
-- **Fluent waits** — `awaitUntil(...).changeTo(...)`, `toAppear`, `toDisappear`.
+- **Rich selectors** — find elements by `id`, `text`, `contentDescription`, `className`, `packageName`, `index`. Each text field accepts an exact string **or** a `{ contains | regex | caseInsensitive | equals }` matcher, plus `enabled` / `visible` filters and a relative `containsDescendant`. Resolver under the hood: Android `/hierarchy` JSON, iOS WDA `/session/:id/source` XML (parsed into a **nested** tree).
+- **Gestures & scrolling** — `swipe(...)`, `scroll(direction)`, and `scrollUntilVisible(selector)` (scrolls, settles, and re-reads the hierarchy until a visible match appears).
+- **Fluent waits** — `awaitUntil(...).changeTo(...)`, `toAppear`, `toDisappear`, plus `waitForIdle()` to settle animations before reading the UI.
+- **Agent/debug-friendly `describe()`** — a pruned, normalized, visible-only outline of the screen (ids/text/center coords) instead of raw hierarchy JSON.
+- **Flow recording** — record a sequence of `ds.*` calls and replay it deterministically (YAML).
 - **Cross-platform verbs** — `openUrl`, `installApp`, `launchApp`, `stopApp`, `setLocation`, `pressKey`, `screenshot`.
 - **Android-only verbs** — `grantPermissions`, `enableInstallByThirdParty`, `openDownloads`. Throw `NotSupportedOnPlatformError` on iOS.
 - **Same code, both platforms** — script written against `ds.*` runs on Android emulators, iOS simulators, and (most verbs) iOS physical devices.
@@ -80,14 +83,30 @@ interface SessionOptions {
 ### Selectors
 
 ```ts
+type StringMatch =
+  | string                                  // exact, case-sensitive equality
+  | { equals?: string; contains?: string; regex?: string; caseInsensitive?: boolean };
+
 interface Selector {
-  id?: string;              // Android resource-id (stripped pkg prefix) / iOS accessibility id
-  text?: string;            // visible text or value
-  contentDescription?: string;
-  className?: string;
-  packageName?: string;
-  index?: number;           // when multiple match, pick this one (default 0)
+  id?: StringMatch;            // Android resource-id (stripped pkg prefix) / iOS accessibility id
+  text?: StringMatch;          // visible text or value
+  contentDescription?: StringMatch;
+  className?: StringMatch;
+  packageName?: StringMatch;
+  index?: number;              // when multiple match, pick this one (default 0)
+  enabled?: boolean;           // require el.enabled === this
+  visible?: boolean;           // require visibility (unknown-visibility nodes are permitted)
+  containsDescendant?: Selector; // relative: element must have a descendant matching this
 }
+```
+
+A bare string is exact equality (back-compatible). The object form composes constraints — **all** provided constraints must hold; `caseInsensitive` applies to `equals` / `contains` / `regex`.
+
+```ts
+await ds.tapOn({ text: { contains: 'Sign' } });               // substring
+await ds.get({ id: { regex: 'btn_(login|signin)$' } }).tap(); // regex
+await ds.tapOn({ className: 'Row', containsDescendant: { text: 'Delete' } }); // relative
+await ds.get({ text: 'Submit', visible: true }).tap();        // only if visible
 ```
 
 ### Session methods
@@ -101,6 +120,11 @@ interface Selector {
 | `hierarchy()` | `/hierarchy` JSON parsed → `UIElement[]` | WDA XML parsed | same |
 | `get(selector)` → `ElementHandle` | hierarchy → bounds → resolve | same | same |
 | `tapOn(selector)` | resolve + `/tap` | resolve + WDA `actions` | same |
+| `swipe({fromX,fromY,toX,toY,durationMs?})` | `/swipe` (duration→steps) | WDA pointer `actions` | same |
+| `scroll(direction, opts?)` | swipe across screen (from `/info` size) | swipe across screen (WDA `/window/size`) | same |
+| `scrollUntilVisible(selector, opts?)` | scroll + settle + re-read until visible | same | same |
+| `waitForIdle(timeoutMs?)` | `/waitForIdle` | best-effort settle | same |
+| `describe()` / `describeText()` | pruned visible-only tree / indented outline | same | same |
 | `copyText(selector)` | hierarchy text | source XML value/label | same |
 | `awaitUntil(s).changeTo(t)` | poll `/hierarchy` | poll WDA `/source` | same |
 | `installApp(path)` | `adb install -r -g` | `simctl install` | `ios install --udid --path` |
@@ -139,6 +163,68 @@ interface WaitHandle {
 }
 ```
 
+### Gestures & scrolling
+
+```ts
+// Raw swipe in screen coordinates.
+await ds.swipe({ fromX: 200, fromY: 600, toX: 200, toY: 200, durationMs: 300 });
+
+// One page in a direction. `direction` is the way you travel through content —
+// the finger moves the opposite way (scroll 'down' reveals lower content).
+await ds.scroll('down');                          // distance defaults to 0.6 of the screen
+await ds.scroll('right', { distance: 0.8 });
+
+// Scroll until a (visible) element appears, then act on it.
+const el = await ds.scrollUntilVisible({ text: 'Place order' }, { direction: 'down', maxScrolls: 8 });
+await ds.tapOn({ text: 'Place order' });
+```
+
+`scrollUntilVisible` reads the hierarchy, scrolls if the (visible) selector is absent, calls `waitForIdle` to settle animations, and repeats up to `maxScrolls` (default 10) before throwing `ElementNotFoundError`.
+
+### `describe()` — agent/debug snapshot
+
+`describe()` returns a pruned, normalized, **visible-only** tree (anonymous structural containers with no identifiable descendants are dropped); `describeText()` renders it as an indented outline you can hand to an LLM or print while debugging:
+
+```ts
+console.log(await ds.describeText());
+// XCUIElementTypeWindow @195,422
+//   Button #login "Log In" @195,725
+//   StaticText "Total: $30" @120,300
+```
+
+Each node carries `center` (a tap target), `id`, `text`, `contentDescription`, `className`, and `enabled`.
+
+### Flow recording
+
+Record `ds.*` calls and replay them deterministically — handy for repro, fixtures, and CI:
+
+```ts
+import { FlowRecorder, serializeFlow, parseFlow, executeFlow } from '@device-stream/dsl';
+
+const rec = new FlowRecorder(ds, 'checkout');
+await rec.launchApp('com.example');
+await rec.tapOn({ text: 'Buy' });
+await rec.fill({ id: 'qty' }, '3');
+const flow = rec.finish();
+
+const yaml = serializeFlow(flow);     // persist
+await executeFlow(ds, parseFlow(yaml)); // replay later (or via the MCP `dsl_run_flow` tool)
+```
+
+Flows serialize to YAML with JSON-inline step args (valid YAML, exact round-trip):
+
+```yaml
+# device-stream flow
+name: checkout
+steps:
+  - action: launchApp
+    args: {"id":"com.example"}
+  - action: tapOn
+    args: {"selector":{"text":"Buy"}}
+  - action: fill
+    args: {"selector":{"id":"qty"},"text":"3"}
+```
+
 ## Permission name translation (iOS)
 
 When `grantPermissions(pkg, perms)` runs on `iosKind: 'simulator'`, Android-style permission strings are auto-translated to `simctl privacy` services:
@@ -175,17 +261,19 @@ These must be present on `$PATH` when the DSL runs:
 
 ```
 src/
-├── index.ts              # public surface: createSession + types
-├── types.ts              # Selector, UIElement, SessionOptions, errors
-├── session.ts            # DeviceStreamSessionImpl + Element/Wait handles + polling
+├── index.ts              # public surface: createSession + types + flow exports
+├── types.ts              # Selector, StringMatch, UIElement, gesture/scroll opts, errors
+├── session.ts            # DeviceStreamSessionImpl + Element/Wait handles + gestures + polling
+├── flow.ts               # FlowRecorder + serialize/parse/execute (YAML)
 ├── shell.ts              # runCmd / adb / adbShell / simctl (execFile, no shell)
 ├── drivers/
-│   ├── types.ts          # internal Driver interface
+│   ├── types.ts          # internal Driver interface (incl. swipe/screenSize/waitForIdle)
 │   ├── android.ts        # android-server :9008 + adb
 │   └── ios.ts            # WDA :8100 + simctl + go-ios
 └── selectors/
-    ├── matcher.ts        # findElement + centerOf
-    └── wda-xml.ts        # zero-dep parser for WDA source XML
+    ├── matcher.ts        # matchString + elementMatches + flattenTree + findElement + centerOf
+    ├── describe.ts       # pruned/normalized tree (describeElements + renderDescription)
+    └── wda-xml.ts        # zero-dep nested parser for WDA source XML
 ```
 
 ## See also

@@ -1,4 +1,4 @@
-import type { HardwareKey, IOSKind, IOSPrivacyService, UIElement } from '../types';
+import type { HardwareKey, IOSKind, IOSPrivacyService, ScreenshotOptions, UIElement } from '../types';
 import { runCmd, simctl } from '../shell';
 import { NotSupportedOnPlatformError } from '../types';
 import type { Driver } from './types';
@@ -107,6 +107,43 @@ export class IOSDriver implements Driver {
     });
   }
 
+  async swipe(fromX: number, fromY: number, toX: number, toY: number, durationMs: number): Promise<void> {
+    const sid = await this.ensureSession();
+    await this.wdaFetch(`/session/${sid}/actions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        actions: [{
+          type: 'pointer', id: 'finger1', parameters: { pointerType: 'touch' },
+          actions: [
+            { type: 'pointerMove', duration: 0, x: fromX, y: fromY },
+            { type: 'pointerDown', button: 0 },
+            { type: 'pointerMove', duration: Math.max(1, durationMs), x: toX, y: toY },
+            { type: 'pointerUp', button: 0 },
+          ],
+        }],
+      }),
+    });
+  }
+
+  async screenSize(): Promise<{ width: number; height: number }> {
+    const sid = await this.ensureSession();
+    const res = await this.wdaFetch(`/session/${sid}/window/size`);
+    const data = await res.json() as { value?: { width?: number; height?: number } };
+    const w = data.value?.width;
+    const h = data.value?.height;
+    if (typeof w !== 'number' || typeof h !== 'number') {
+      throw new Error('WDA /window/size did not return width/height');
+    }
+    return { width: w, height: h };
+  }
+
+  async waitForIdle(timeoutMs: number): Promise<void> {
+    // WDA exposes no idle endpoint; settle briefly so animations finish before
+    // the next hierarchy read. Capped so it never blocks for the full timeout.
+    await new Promise((r) => setTimeout(r, Math.min(350, Math.max(0, timeoutMs))));
+  }
+
   async typeText(text: string): Promise<void> {
     const sid = await this.ensureSession();
     const activeRes = await this.wdaFetch(`/session/${sid}/element/active`);
@@ -137,7 +174,10 @@ export class IOSDriver implements Driver {
     throw new NotSupportedOnPlatformError(`pressKey(${key})`, 'ios');
   }
 
-  async screenshot(): Promise<Buffer> {
+  async screenshot(_opts?: ScreenshotOptions): Promise<Buffer> {
+    // WDA returns a full-resolution PNG and offers no capture-time downscale,
+    // so `scale` is accepted for interface parity but ignored here. Callers that
+    // need a size bound (the MCP layer) enforce it after encoding.
     const sid = await this.ensureSession();
     const res = await this.wdaFetch(`/session/${sid}/screenshot`);
     const data = await res.json() as { value?: string };
