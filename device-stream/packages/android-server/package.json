@@ -1,6 +1,6 @@
 {
   "name": "@device-stream/android-server",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "On-device TCP JSON-RPC server for Android UI automation (UiAutomator)",
   "private": true,
   "scripts": {

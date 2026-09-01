@@ -1,0 +1,6 @@
+# Gradle
+.gradle/
+build/
+
+# SDK location (machine-specific)
+local.properties

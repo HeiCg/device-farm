@@ -41,16 +41,12 @@ object NodeSerializer {
     ) {
         if (elements.size >= maxElements) return
 
-        val keep = TreeCompressor.shouldKeep(node)
-
-        // Apply tree compression
-        if (keep) {
+        // Emit-filter: keep meaningful nodes, but ALWAYS recurse. A skippable
+        // node (e.g. the id-less root FrameLayout) carries meaningful
+        // descendants, so pruning its whole subtree would drop the entire
+        // screen. `maxElements` is the only traversal stop.
+        if (TreeCompressor.shouldKeep(node)) {
             elements.add(nodeToJson(node))
-        }
-
-        // Skip subtrees for empty layout containers with no meaningful children potential
-        if (!keep && TreeCompressor.shouldSkipSubtree(node)) {
-            return
         }
 
         // Recurse into children

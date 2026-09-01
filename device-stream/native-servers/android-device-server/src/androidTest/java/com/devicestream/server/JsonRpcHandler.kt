@@ -28,7 +28,7 @@ class JsonRpcHandler(
     private val longPressHandler = LongPressHandler(uiDevice)
     private val keyHandler = KeyHandler(uiDevice)
     private val screenshotHandler = ScreenshotHandler(uiAutomation)
-    private val hierarchyHandler = HierarchyHandler(uiAutomation)
+    private val hierarchyHandler = HierarchyHandler(uiDevice, uiAutomation)
     private val infoHandler = InfoHandler(uiDevice, uiAutomation)
     private val stateHandler = StateHandler(uiDevice, uiAutomation)
     private val waitHandler = WaitHandler(uiDevice)
