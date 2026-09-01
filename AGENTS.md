@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Project Overview
 
@@ -55,7 +55,7 @@ Plugins must register in dependency order. Each declares `{ dependencies: ['...'
 1. config → 2. dependency-checker → 3. pool → 4. db → 5. auth → 6. websocket → 7. artifacts → 8. reporting → 9. jobs → 10. lifecycle → 11. api → 12. static
 
 ### device-stream Monorepo (`device-stream/`)
-In-repo npm workspaces (`@device-stream/*`) plus native binaries that handle device control + streaming. The `streaming/` and `sessions/` modules consume the packages; **lifecycle hooks** can also invoke them via tsx scripts (see `docs/runbooks/device-stream.md` and `docs/runbooks/hooks-device-stream.md`). Per-device `DeviceMutexManager` (in `@device-stream/core`) is an **in-process** mutex: it serialises the MCP DSL tool calls and same-process service commands. It does **not** reach across processes — a hook-spawned `tsx` script child runs outside it, so cross-process device access relies on tool-call sequencing, not the mutex.
+In-repo npm workspaces (`@device-stream/*`) plus native binaries that handle device control + streaming. The `streaming/` and `sessions/` modules consume the packages; **lifecycle hooks** can also invoke them via tsx scripts (see `docs/runbooks/device-stream.md` and `docs/runbooks/hooks-device-stream.md`). Per-device `DeviceMutexManager` (in `@device-stream/core`) serialises commands across streams, sessions, and hook-triggered scripts so they don't fight each other.
 
 **`@device-stream/dsl`** (`device-stream/packages/dsl/`) — high-level selector + orchestration DSL on top of `@device-stream/android-server` (HTTP :9008), WDA (iOS :8100), `adb`, `xcrun simctl`, `go-ios`. Single API (`ds.get({ id }).fill(...)`, `ds.installApp(...)`, `ds.grantPermissions(...)`, `ds.awaitUntil(...).changeTo(...)`) that runs on Android emulators, iOS Simulators, and (most verbs) iOS physical devices. `iosKind: 'simulator' | 'device'` selects between simctl and go-ios. Android-only verbs (`grantPermissions`, `enableInstallByThirdParty`, `openDownloads`) throw `NotSupportedOnPlatformError` on iOS. Used by `kind: 'script'` hooks via the runner; the web Hook editor at `/settings` loads its `.d.ts` into Monaco for typed autocomplete. See `device-stream/packages/dsl/README.md` and `docs/runbooks/dsl-hooks.md`.
 

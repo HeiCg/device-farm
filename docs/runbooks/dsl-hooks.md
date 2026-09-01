@@ -51,8 +51,8 @@ What the server does when this fires:
 2. It writes a temp file `<projectRoot>/.df-hook-tmp/run-XXX/hook.mts` whose body is your `script:` wrapped in this prelude:
    ```ts
    import { createSession } from '@device-stream/dsl';
-   const ctx = JSON.parse(process.env.DEVICE_FARM_HOOK_CTX);
-   const vars = JSON.parse(process.env.DEVICE_FARM_HOOK_VARS);
+   const ctx = JSON.parse(process.env.DS_SCRIPT_CTX);
+   const vars = JSON.parse(process.env.DS_SCRIPT_VARS);
    const { url, username, password, packageName /* every valid-identifier key in vars */ } = vars;
    const ds = await createSession({ serial: ctx.serial, platform: ctx.platform, iosKind: '<your iosKind>' });
    try {
@@ -277,7 +277,7 @@ For script hooks specifically:
 - The `command` field of the `HookResult` is `'script:<name>'` (placeholder — the actual script body is in the hook definition).
 - `stdout` contains everything your `console.log` printed.
 - `stderr` contains both intentional `console.error` and uncaught throws / `tsx` import errors.
-- The temp file at `<projectRoot>/.df-hook-tmp/run-<uuid>/hook.mts` is removed on success or failure; a leftover indicates a process kill (SIGKILL beat the cleanup).
+- The temp file at `<projectRoot>/.df-hook-tmp/run-<uuid>/hook.mts` is removed on success or failure; a leftover indicates a hard kill (SIGKILL beat the cleanup); the runner sweeps `run-*` entries older than 24 h on its next start.
 
 ---
 

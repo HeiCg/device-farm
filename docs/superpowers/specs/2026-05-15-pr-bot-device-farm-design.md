@@ -294,8 +294,12 @@ Runs in the server process (no spawn). Responsibilities:
 4. Emits `##device-farm[setvariable name=PASSWORD]<value>` so subsequent
    stages inherit. Also exports `WORKSPACE_DIR`.
 
-The password never reaches logs (the marker is masked at parse time when
-the variable name is in a configurable secret-set: `['PASSWORD', 'PAT', 'TOKEN']`).
+The password is masked in stage logs: values registered as secrets — via a
+`setvariable` marker whose name is in the secret-set (`['PASSWORD', 'PAT',
+'TOKEN']`), or exported by an executor callback flagged secret — are seeded
+into every later stage's log parser and substring-replaced before emission.
+Masking is literal substring replacement, so a value reconstructed in parts
+is not caught; treat stage logs as sensitive regardless.
 
 ### `internal-release`
 
@@ -566,9 +570,11 @@ E2E manual:
 1. **Suite glob convention:** `Tests/<suite>/**/*.yaml` is an assumption.
    If repos use a different layout, expose it as a per-integration setting
    (`suite_glob_template`).
-2. **`config.js` safe parsing:** `vm.runInNewContext` is a sandbox but not
-   bulletproof. If `config.js` does anything more than export a flat object,
-   we may need a stricter format (e.g. `config.json`).
+2. **`config.js` safe parsing:** `vm.runInNewContext` isolates a context but
+   is not a security boundary (constructor-chain escapes reach the host
+   process). It is acceptable only because `config.js` comes from repos we
+   already run code from; if that ever changes, or `config.js` does anything
+   more than export a flat object, switch to a strict format (`config.json`).
 3. **`device-stream` package surface:** the pre-setup script will import
    from where? The vendored tgz in `vendor/device-stream/`? An npm install?
    This is a question for the script author (the user), not the device-farm.
