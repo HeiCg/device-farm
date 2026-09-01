@@ -27,6 +27,26 @@ describe('internal-clone executor', () => {
     expect(exported.WORKSPACE_DIR).toBe(workDir);
   });
 
+  it('marks the exported PASSWORD as a secret (WORKSPACE_DIR is not)', async () => {
+    const workDir = await mkdtemp(join(tmpdir(), 'icx-'));
+    await writeFile(
+      join(workDir, 'config.js'),
+      `module.exports = { USERNAMES: { name_1: { password: 'secret123' } } };`,
+    );
+
+    const flags: Record<string, boolean | undefined> = {};
+    const result = await runInternalCloneStage({
+      workDir,
+      account: 'name_1',
+      onExport: (k, _v, o) => { flags[k] = o?.secret; },
+      logger: fakeLogger,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(flags.PASSWORD).toBe(true);
+    expect(flags.WORKSPACE_DIR).toBeFalsy();
+  });
+
   it('fails when account is missing from config.js', async () => {
     const workDir = await mkdtemp(join(tmpdir(), 'icx-'));
     await writeFile(

@@ -100,6 +100,12 @@ interface RunContext {
   startedAt: number;
   /** Env vars exported by internal-clone / device-stream-script stages. */
   exportedEnv?: Record<string, string>;
+  /**
+   * Secret values exported by earlier stages (e.g. the internal-clone PASSWORD)
+   * that must be masked in every subsequent stage's log lines. Seeded into each
+   * newly created InterStageEnvParser's secretValues.
+   */
+  secretValues?: Set<string>;
   /** Device allocated for this run (used by device-stream-script + internal-release). */
   allocatedDevice?: { id: string; platform: Platform; emulatorId: string } | null;
   /**
@@ -582,7 +588,10 @@ export class PipelineService {
         const r = await runInternalCloneStage({
           workDir: ctx.workDir,
           account,
-          onExport: (k, v) => { ctx.exportedEnv = { ...(ctx.exportedEnv ?? {}), [k]: v }; },
+          onExport: (k, v, o) => {
+            ctx.exportedEnv = { ...(ctx.exportedEnv ?? {}), [k]: v };
+            if (o?.secret) (ctx.secretValues ??= new Set<string>()).add(v);
+          },
           logger: this.logger,
         });
         if (!r.ok) throw new Error(r.error ?? 'internal-clone failed');
@@ -637,7 +646,11 @@ export class PipelineService {
           env,
           timeoutSec: stage.timeout,
           onLog: (line) => this.emitStageEvent(runId, 'stage_log', { stage: stage.name, line }),
-          onExport: (k, v) => { ctx.exportedEnv = { ...(ctx.exportedEnv ?? {}), [k]: v }; },
+          onExport: (k, v, o) => {
+            ctx.exportedEnv = { ...(ctx.exportedEnv ?? {}), [k]: v };
+            if (o?.secret) (ctx.secretValues ??= new Set<string>()).add(v);
+          },
+          secretValues: ctx.secretValues ? [...ctx.secretValues] : undefined,
           logger: this.logger,
         });
         if (!r.ok) throw new Error(r.error ?? 'device-stream-script failed');

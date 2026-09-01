@@ -74,6 +74,58 @@ describe('inter-stage env marker parser', () => {
     expect(exported).toEqual({ A: '1', B: '2' });
   });
 
+  it('masks pre-seeded secret values from the first line (callback-exported secrets)', () => {
+    // Simulates the internal-clone PASSWORD: it never appears as a setvariable
+    // marker in this stage's stream, so it must be seeded into secretValues up
+    // front. The value must be masked even on the very first log line.
+    const logged: string[] = [];
+    const sink: EnvSink = { set: () => {}, log: (line) => { logged.push(line); } };
+    const parser = createMarkerParser(sink, { secretValues: ['hunter2'] });
+
+    parser.write('login as admin with pwd=hunter2\n');
+    parser.end();
+
+    expect(logged.join('\n')).not.toContain('hunter2');
+    expect(logged.join('\n')).toContain('***');
+  });
+
+  it('reports secret marker names via set opts.secret', () => {
+    const seen: Array<{ k: string; secret: boolean | undefined }> = [];
+    const sink: EnvSink = {
+      set: (k, _v, o) => { seen.push({ k, secret: o?.secret }); },
+      log: () => {},
+    };
+    const parser = createMarkerParser(sink, { secretNames: ['PASSWORD'] });
+
+    parser.write('##device-farm[setvariable name=PASSWORD]s3cret\n');
+    parser.write('##device-farm[setvariable name=PUBLIC]hello\n');
+    parser.end();
+
+    expect(seen).toEqual([
+      { k: 'PASSWORD', secret: true },
+      { k: 'PUBLIC', secret: false },
+    ]);
+  });
+
+  it('caps a newline-free flood: flushes truncated (masked) chunk and resets', () => {
+    const logged: string[] = [];
+    const sink: EnvSink = { set: () => {}, log: (line) => { logged.push(line); } };
+    const parser = createMarkerParser(sink, { secretValues: ['topsecret'] });
+
+    // 200 KB with no newline — well over the 64 KB cap. Embed a secret to prove
+    // the flushed chunk is still masked.
+    parser.write('topsecret' + 'x'.repeat(200 * 1024));
+    parser.end();
+
+    expect(logged.length).toBeGreaterThanOrEqual(1);
+    const joined = logged.join('');
+    expect(joined).not.toContain('topsecret');
+    expect(joined).toContain('***');
+    // The pending buffer was reset — total flushed stays bounded near the cap,
+    // not the full 200 KB in one unbounded line.
+    expect(logged[0].length).toBeLessThanOrEqual(64 * 1024 + 16);
+  });
+
   it('ignores malformed markers', () => {
     const exported: Record<string, string> = {};
     const logged: string[] = [];

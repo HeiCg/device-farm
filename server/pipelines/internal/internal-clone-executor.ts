@@ -6,7 +6,7 @@ import type pino from 'pino';
 export interface InternalCloneStageOpts {
   workDir: string;
   account: string;
-  onExport(key: string, value: string): void;
+  onExport(key: string, value: string, opts?: { secret?: boolean }): void;
   logger: pino.Logger;
 }
 
@@ -52,7 +52,7 @@ export async function runInternalCloneStage(
     return { ok: false, error: `unknown account '${opts.account}' in config.js USERNAMES` };
   }
 
-  opts.onExport('PASSWORD', account.password);
+  opts.onExport('PASSWORD', account.password, { secret: true });
   opts.onExport('WORKSPACE_DIR', opts.workDir);
   opts.logger.info({ account: opts.account }, 'internal-clone: account resolved');
   return { ok: true };

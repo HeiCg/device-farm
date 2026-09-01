@@ -172,7 +172,7 @@ export class HookExecutor {
     try {
       const { stdout, stderr } = await execFileAsync(
         '/bin/sh', ['-c', command],
-        { timeout, env: this.buildEnv(context) },
+        { timeout, env: this.buildEnv(context), maxBuffer: 16 * 1024 * 1024 },
       );
 
       const durationMs = Date.now() - start;

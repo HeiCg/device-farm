@@ -132,5 +132,18 @@ describe('HookExecutor', () => {
       ex.setHooks([def({ name: 'strict', command: 'false', failOnError: true })]);
       await expect(ex.execute('device.booted', makeContext())).rejects.toThrow(/strict/);
     });
+
+    it('shell path tolerates >1MB output (maxBuffer parity with the script path)', async () => {
+      // 1.5 MB of stdout — over Node's default 1 MB execFile maxBuffer, which
+      // would surface as ENOBUFS (a spurious hook failure) before the fix.
+      const ex = new HookExecutor(silentLogger);
+      ex.setHooks([
+        def({ name: 'flood', command: `head -c 1500000 /dev/zero | tr '\\0' 'a'` }),
+      ]);
+      const results = await ex.execute('device.booted', makeContext());
+      expect(results).toHaveLength(1);
+      expect(results[0].success).toBe(true);
+      expect(results[0].exitCode).toBe(0);
+    });
   });
 });

@@ -9,8 +9,10 @@ export interface DeviceStreamScriptOpts {
   env: Record<string, string>;
   timeoutSec: number;
   onLog(line: string): void;
-  onExport(key: string, value: string): void;
+  onExport(key: string, value: string, opts?: { secret?: boolean }): void;
   logger: pino.Logger;
+  /** Secret values from earlier stages to mask in this stage's log lines. */
+  secretValues?: string[];
 }
 
 export interface DeviceStreamScriptResult {
@@ -35,8 +37,8 @@ export async function runDeviceStreamScript(
   }
 
   const parser = createMarkerParser(
-    { set: (k, v) => opts.onExport(k, v), log: (l) => opts.onLog(l) },
-    { secretNames: ['PASSWORD', 'PAT', 'TOKEN'] },
+    { set: (k, v, o) => opts.onExport(k, v, o), log: (l) => opts.onLog(l) },
+    { secretNames: ['PASSWORD', 'PAT', 'TOKEN'], secretValues: opts.secretValues },
   );
 
   return new Promise((resolveOuter) => {
