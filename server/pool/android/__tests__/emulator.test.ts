@@ -155,7 +155,7 @@ describe('AndroidEmulatorDriver', () => {
 
       const result = await driver.boot('test-avd');
 
-      expect(result).toEqual({ port: 5554, pid: 12345 });
+      expect(result).toEqual({ port: 5554, pid: 12345, grpcPort: 8554 });
 
       // Check spawn was called with correct flags
       expect(mockSpawn).toHaveBeenCalledWith(
@@ -197,7 +197,7 @@ describe('AndroidEmulatorDriver', () => {
       // Should not hang -- proves trimming works
       const result = await driver.boot('test-avd');
 
-      expect(result).toEqual({ port: 5554, pid: 12345 });
+      expect(result).toEqual({ port: 5554, pid: 12345, grpcPort: 8554 });
       expect(mockSpawn).toHaveBeenCalled();
     });
 
@@ -229,7 +229,7 @@ describe('AndroidEmulatorDriver', () => {
 
       const result = await driver.boot('test-avd');
 
-      expect(result).toEqual({ port: 5556, pid: 99999 });
+      expect(result).toEqual({ port: 5556, pid: 99999, grpcPort: 8554 });
 
       // Verify emulator spawned with -port 5556
       const spawnArgs = mockSpawn.mock.calls[0][1] as string[];

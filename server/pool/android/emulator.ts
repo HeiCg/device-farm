@@ -13,6 +13,7 @@ import type pino from 'pino';
 import type { DeviceDriver, DeviceConfig, AndroidDeviceConfig, BootOptions, BootResult } from '../types.js';
 import { ensureAvdExists, listAvds, deleteAvd } from './avd.js';
 import { getZombieInfo, isProcessAlive, getProcessStat, isZombieStat } from '../zombie-detector.js';
+import { buildEmulatorBootArgs, kvmPreflight } from './boot-args.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -112,27 +113,27 @@ export class AndroidEmulatorDriver implements DeviceDriver {
       this.clearAvdLocks(emulatorId);
     }
 
-    // 4. Spawn emulator — argv driven by BootOptions (Phase 31 / Plan 31-03 / SC3).
-    // Defaults mirror bootOptionsSchema (server/config/schema.ts): noAudio=true,
-    // coldBoot=false, gpu='swiftshader_indirect'. Passing `undefined` options
-    // (or omitting the field) preserves pre-Phase-31 emulator behavior.
-    const args: string[] = [
-      '-avd', effectiveAvd,
-      '-no-window', '-no-boot-anim',
-      '-port', String(port),
-      // Phase 33: inject EmulatorController gRPC port (band 8554-8650) immediately
-      // after `-port` and BEFORE optional flags — matches kittyfarm
-      // EmulatorManager.swift:73-77 ordering for AOSP wire compat.
-      '-grpc', String(grpcPort),
-    ];
-    if (options?.coldBoot === true) {
-      args.push('-no-snapshot-load');
-    }
-    // noAudio defaults to TRUE. Only omit `-no-audio` when explicitly false.
-    if (options?.noAudio !== false) {
-      args.push('-no-audio');
-    }
-    args.push('-gpu', options?.gpu ?? 'swiftshader_indirect');
+    // 3b. Host preflight: warn loudly if KVM is unusable on Linux (TCG fallback
+    // is 10–50× slower and otherwise silently degrades every boot).
+    const kvm = kvmPreflight(process.env);
+    if (!kvm.usable) this.logger.warn({ kvm }, kvm.reason);
+
+    // 4. Spawn emulator — argv driven by BootOptions + env (Plan 31-03 / SC3 +
+    // boot hardening). Defaults mirror bootOptionsSchema (noAudio=true,
+    // coldBoot=false, gpu='swiftshader_indirect'); env can override gpu/headless
+    // (DEVICE_FARM_EMULATOR_GPU_MODE / _NO_WINDOW). Order is preserved and the
+    // gRPC port (band 8554-8650) lands right after `-port` for AOSP wire compat.
+    const args = buildEmulatorBootArgs(
+      {
+        avd: effectiveAvd,
+        port,
+        grpcPort,
+        gpu: options?.gpu,
+        noAudio: options?.noAudio,
+        coldBoot: options?.coldBoot,
+      },
+      process.env,
+    );
 
     const proc = spawn(
       'emulator',
