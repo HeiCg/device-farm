@@ -15,6 +15,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { DeviceFarmClient } from './client.js';
 import { registerAllTools } from './tools/index.js';
 import { registerDevicesResource } from './resources/devices.js';
+import { registerDslTools, createSessionFromEnv, memoizeSession } from './dsl/register.js';
 
 async function main(): Promise<void> {
   const baseUrl = process.env.DEVICE_FARM_URL ?? 'http://localhost:3000';
@@ -36,6 +37,17 @@ async function main(): Promise<void> {
 
   registerAllTools(server, client);
   registerDevicesResource(server, client);
+
+  // When a direct device target is configured, also expose the rich DSL tools
+  // (selector tap/fill, scroll-until-visible, describe, flow replay) that talk
+  // straight to android-server / WDA via @device-stream/dsl. The session is
+  // resolved lazily and memoized so it connects on first use.
+  if (process.env.DEVICE_STREAM_SERIAL && process.env.DEVICE_STREAM_PLATFORM) {
+    registerDslTools(server, memoizeSession(() => createSessionFromEnv()));
+    process.stderr.write(
+      `device-stream-mcp: DSL tools enabled for ${process.env.DEVICE_STREAM_PLATFORM} ${process.env.DEVICE_STREAM_SERIAL}.\n`,
+    );
+  }
 
   const transport = new StdioServerTransport();
 
