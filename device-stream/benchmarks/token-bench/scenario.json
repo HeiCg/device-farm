@@ -1,0 +1,21 @@
+{
+  "name": "android-settings-10-step",
+  "target": {
+    "platform": "android",
+    "app": "com.android.settings",
+    "emulatorImage": "Pixel 7, Android 15 (API 35), google_apis arm64-v8a",
+    "note": "Labels are the Android 15 Settings flow, emulator-verified live on emulator-5554. Data, not code — adjust here if labels differ. Implementation notes: step 1 'launch' is issued via `adb am start --activity-clear-task` in the harness because the DSL's monkey-based launchApp does not foreground com.android.settings on this image (the dsl_launch_app call is still measured); the search input matched by id `open_search_view_edit_text`."
+  },
+  "steps": [
+    { "n": 1, "verb": "launch", "desc": "launch Settings", "arg": "com.android.settings" },
+    { "n": 2, "verb": "orient", "desc": "describe/orient on the Settings root list" },
+    { "n": 3, "verb": "tap", "desc": "tap 'Network & internet'", "label": "Network & internet" },
+    { "n": 4, "verb": "assert-visible", "desc": "assert 'Internet' visible", "label": "Internet" },
+    { "n": 5, "verb": "back", "desc": "press back to the Settings root" },
+    { "n": 6, "verb": "search-type", "desc": "tap search, type 'battery'", "label": "Search settings", "text": "battery" },
+    { "n": 7, "verb": "tap", "desc": "tap the first search result", "label": "Battery" },
+    { "n": 8, "verb": "assert-visible", "desc": "assert a battery-screen element visible", "label": "Battery" },
+    { "n": 9, "verb": "toggle-assert", "desc": "toggle Battery Saver and assert state change", "label": "Battery Saver" },
+    { "n": 10, "verb": "back-assert-home", "desc": "back to root, assert home/Settings root visible", "label": "Settings" }
+  ]
+}

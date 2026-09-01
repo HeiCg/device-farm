@@ -1,0 +1,25 @@
+{
+  "name": "@device-stream/profiler",
+  "version": "0.1.0",
+  "description": "Backend-agnostic mobile profiling: pure analysis core (CPU hotspots + hangs) over a normalized profile IR, with React Native (Metro CDP) and native (xctrace / Perfetto) capture backends.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit",
+    "test": "vitest run --config ../../vitest.config.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}

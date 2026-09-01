@@ -1,0 +1,31 @@
+{
+  "name": "ios-settings-10-step",
+  "target": {
+    "platform": "ios",
+    "app": "com.apple.Preferences",
+    "simulator": "QA-iPhone17, iOS 26.4 (com.apple.CoreSimulator.SimRuntime.iOS-26-4)",
+    "locale": "pt-BR",
+    "note": "Labels are the iOS 26.4 Settings flow on a pt-BR simulator, live-verified on udid DBF8B093-58A2-4B57-812A-60D6CF8594BD. Data, not code. Environment facts driving the design: (1) argent `launch-app` returns status:init_failed here because the React-Native native-devtools dylib is not in the published package, so the harness foregrounds Settings via `xcrun simctl launch` (the iOS analog of the Android `am start` accommodation) and still measures the `launch-app` call for its token cost. (2) `simctl launch` restores Settings' last sub-screen (iOS state restoration), so the harness resets to the root by tapping the `BackButton` element until it is gone. (3) iOS taps are fire-and-forget (argent issue #547) so every navigation tap is verified by re-describe. (4) iOS 26 sim Settings exposes no shallow toggle switch and no describe-visible search field, so the Android 'toggle Battery Saver + assert state change' step is realized here as a 'navigate into a section + assert the new screen' transition — the interaction SHAPE (one agent action + one assert per step) that the token benchmark measures is preserved; the deviation is recorded in RESULTS.md/SUMMARY.md. Asserts use stable `com.apple.settings.*` / `BackButton` accessibility identifiers rather than localized text.",
+    "rootMarkerId": "com.apple.settings.general",
+    "backButtonId": "BackButton"
+  },
+  "coords": {
+    "note": "Normalized [0,1] centres of root rows, captured live. Used blind by the run-sequence config (A4-ios), which cannot re-describe between steps.",
+    "general": { "x": 0.5, "y": 0.485 },
+    "accessibility": { "x": 0.5, "y": 0.545 },
+    "camera": { "x": 0.5, "y": 0.782 },
+    "backButton": { "x": 0.095, "y": 0.096 }
+  },
+  "steps": [
+    { "n": 1, "verb": "launch", "desc": "launch Settings (simctl launch; launch-app call measured)", "arg": "com.apple.Preferences" },
+    { "n": 2, "verb": "orient", "desc": "describe/orient on the Settings root list" },
+    { "n": 3, "verb": "tap", "desc": "tap 'Geral' (General)", "id": "com.apple.settings.general", "label": "Geral" },
+    { "n": 4, "verb": "assert-visible", "desc": "assert the General sub-screen (BackButton present)", "id": "BackButton" },
+    { "n": 5, "verb": "back", "desc": "tap BackButton to the Settings root" },
+    { "n": 6, "verb": "tap", "desc": "tap 'Acessibilidade' (Accessibility)", "id": "com.apple.settings.accessibility", "label": "Acessibilidade" },
+    { "n": 7, "verb": "assert-visible", "desc": "assert the Accessibility sub-screen (BackButton present)", "id": "BackButton" },
+    { "n": 8, "verb": "back", "desc": "tap BackButton to the Settings root" },
+    { "n": 9, "verb": "tap-assert", "desc": "tap 'Câmera' (Camera) and assert the Camera sub-screen (transition)", "id": "com.apple.settings.camera", "label": "Câmera" },
+    { "n": 10, "verb": "back-assert-home", "desc": "tap BackButton to root, assert the Settings root (General row visible)", "id": "com.apple.settings.general" }
+  ]
+}

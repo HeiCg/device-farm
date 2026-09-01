@@ -1,0 +1,23 @@
+{
+  "name": "@device-stream/token-bench",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Layer-1 mechanical token-cost benchmark: MCP tool-per-call vs agent-authored typed script.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "run-config": "tsx harness/cli.ts",
+    "report": "tsx harness/cli.ts report"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "js-tiktoken": "^1.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
