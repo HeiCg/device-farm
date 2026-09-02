@@ -53,6 +53,17 @@ export interface UIElement {
   children?: UIElement[];
 }
 
+/**
+ * The array `Driver.hierarchy()` returns, optionally flagged when the backend
+ * truncated the tree at its element cap. It IS a `UIElement[]` (roots), so every
+ * existing consumer keeps working; the flags ride as extra array properties that
+ * diagnostics can read without an extra device round-trip.
+ */
+export interface HierarchyTree extends Array<UIElement> {
+  truncated?: boolean;
+  maxElements?: number;
+}
+
 export type IOSKind = 'simulator' | 'device';
 
 export interface SessionOptions {
@@ -65,6 +76,15 @@ export interface SessionOptions {
   wdaSessionId?: string;
   defaultTimeoutMs?: number;
   pollIntervalMs?: number;
+  /**
+   * Android only — max elements the android-server serializes per `hierarchy()`
+   * read. Larger trees are truncated at this cap (default 500). When a read hits
+   * the cap the tree is flagged truncated and `ElementNotFoundError` diagnostics
+   * hint at raising it.
+   */
+  androidMaxElements?: number;
+  /** iOS only — per-request WDA HTTP timeout in ms (default 30000). */
+  wdaTimeoutMs?: number;
 }
 
 /**
@@ -144,6 +164,10 @@ export interface ElementNotFoundDiagnostics {
   screen?: string;
   /** Elements that matched every selector field except `index`. */
   matchedCount?: number;
+  /** The hierarchy read hit its element cap, so the tree may be incomplete. */
+  truncated?: boolean;
+  /** The element cap in effect when the tree was truncated. */
+  maxElements?: number;
 }
 
 /** Hard cap on the total rendered error message length (chars). */
@@ -164,6 +188,11 @@ function buildElementNotFoundMessage(
 
   if (diag && diag.matchedCount && diag.matchedCount > 0 && selector.index !== undefined) {
     msg += `\n${diag.matchedCount} elements matched the selector but index ${selector.index} is out of range.`;
+  }
+
+  if (diag && diag.truncated) {
+    const at = diag.maxElements !== undefined ? ` at ${diag.maxElements} elements` : '';
+    msg += `\nNote: the UI tree was truncated${at}; the target may be off the serialized tree. Raise maxElements (SessionOptions.androidMaxElements).`;
   }
 
   return msg.length > MESSAGE_CAP ? msg.slice(0, MESSAGE_CAP) : msg;

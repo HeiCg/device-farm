@@ -18,7 +18,7 @@ import { ElementNotFoundError } from './types';
 import type { Driver } from './drivers/types';
 import { AndroidDriver } from './drivers/android';
 import { IOSDriver } from './drivers/ios';
-import { centerOf, elementMatches, findElement } from './selectors/matcher';
+import { centerOf, elementMatches, findElement, flattenTree } from './selectors/matcher';
 import {
   buildElementNotFoundDiagnostics,
   describeElements,
@@ -193,10 +193,11 @@ class ElementHandleImpl implements ElementHandle {
   }
 
   async clear(): Promise<void> {
+    // Focus the field, then clear via the platform's dedicated clear path.
+    // Never press BACK — on Android that dismisses the IME and walks out of the
+    // app (keycode 4); on iOS it throws and no-ops. See spec B1.
     await this.tap();
-    for (let i = 0; i < 50; i++) {
-      await this.driver.pressKey('back' as HardwareKey).catch(() => {});
-    }
+    await this.driver.clearText();
   }
 
   async fill(text: string): Promise<void> {
@@ -241,7 +242,7 @@ class WaitHandleImpl implements WaitHandle {
       async () => {
         const tree = await this.driver.hierarchy();
         const sourceGone = findElement(tree, this.selector) === undefined ||
-          tree.some((el) => elementMatches(el, this.selector) && elementMatches(el, target));
+          flattenTree(tree).some((el) => elementMatches(el, this.selector) && elementMatches(el, target));
         const targetPresent = findElement(tree, target) !== undefined;
         return sourceGone && targetPresent;
       },
@@ -308,7 +309,15 @@ function clamp01(n: number): number {
 
 export function createDriver(opts: SessionOptions): Driver {
   if (opts.platform === 'android') {
-    return new AndroidDriver(opts.serial, opts.androidServerUrl);
+    return new AndroidDriver(opts.serial, opts.androidServerUrl, {
+      maxElements: opts.androidMaxElements,
+    });
   }
-  return new IOSDriver({ serial: opts.serial, kind: opts.iosKind, wdaUrl: opts.wdaUrl, sessionId: opts.wdaSessionId });
+  return new IOSDriver({
+    serial: opts.serial,
+    kind: opts.iosKind,
+    wdaUrl: opts.wdaUrl,
+    sessionId: opts.wdaSessionId,
+    timeoutMs: opts.wdaTimeoutMs,
+  });
 }

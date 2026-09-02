@@ -8,6 +8,12 @@ export interface Driver {
   longPress(x: number, y: number, durationMs: number): Promise<void>;
   swipe(fromX: number, fromY: number, toX: number, toY: number, durationMs: number): Promise<void>;
   typeText(text: string): Promise<void>;
+  /**
+   * Clear the currently focused/active text field without navigating. Android
+   * clears via the android-server RPC; iOS via WDA's element `/clear`. Never
+   * emits a hardware BACK key (which would leave the app).
+   */
+  clearText(): Promise<void>;
   pressKey(key: HardwareKey): Promise<void>;
   screenshot(opts?: ScreenshotOptions): Promise<Buffer>;
   hierarchy(): Promise<UIElement[]>;

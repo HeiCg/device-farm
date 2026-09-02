@@ -30,7 +30,7 @@ export type {
   ScrollUntilVisibleOptions,
 };
 export { NotSupportedOnPlatformError, ElementNotFoundError } from './types';
-export type { ElementNotFoundDiagnostics } from './types';
+export type { ElementNotFoundDiagnostics, HierarchyTree } from './types';
 export type { DescribedNode } from './selectors/describe';
 export {
   serializeFlow,

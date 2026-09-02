@@ -1,7 +1,15 @@
-import type { HardwareKey, ScreenshotOptions, UIElement } from '../types';
+import type { HardwareKey, HierarchyTree, ScreenshotOptions, UIElement } from '../types';
 import { adb, adbShell } from '../shell';
 import type { Driver } from './types';
 import { AndroidRpcClient, parseAndroidServerEndpoint } from './android-rpc';
+
+/** Default cap on elements serialized per `hierarchy()` read (see spec B5). */
+const DEFAULT_MAX_ELEMENTS = 500;
+
+export interface AndroidDriverOptions {
+  /** Max elements serialized per hierarchy read. Default 500. */
+  maxElements?: number;
+}
 
 interface AndroidHierarchyNode {
   index: number;
@@ -32,6 +40,7 @@ export class AndroidDriver implements Driver {
   readonly platform = 'android' as const;
   readonly serial: string;
   private readonly rpc: AndroidRpcClient;
+  private readonly maxElements: number;
 
   /**
    * @param serverUrl address of `@device-stream/android-server`. Accepts
@@ -39,10 +48,11 @@ export class AndroidDriver implements Driver {
    *   `http://host:port` URL whose scheme is ignored — the server speaks TCP
    *   JSON-RPC, not HTTP. Defaults to `localhost:9008`.
    */
-  constructor(serial: string, serverUrl?: string) {
+  constructor(serial: string, serverUrl?: string, opts: AndroidDriverOptions = {}) {
     this.serial = serial;
     const { host, port } = parseAndroidServerEndpoint(serverUrl);
     this.rpc = new AndroidRpcClient(host, port);
+    this.maxElements = opts.maxElements ?? DEFAULT_MAX_ELEMENTS;
   }
 
   async tap(x: number, y: number): Promise<void> {
@@ -76,6 +86,12 @@ export class AndroidDriver implements Driver {
     await this.rpc.call('typeText', { text });
   }
 
+  async clearText(): Promise<void> {
+    // Clears the focused editable node on-device (UiObject2.clear()). Never
+    // emits a BACK key. Requires android-server's `clearText` RPC (v1.2.0+).
+    await this.rpc.call('clearText');
+  }
+
   async pressKey(key: HardwareKey): Promise<void> {
     const keyCode = ANDROID_KEYCODES[key];
     if (keyCode === undefined) throw new Error(`Unknown Android key: ${key}`);
@@ -97,15 +113,24 @@ export class AndroidDriver implements Driver {
   }
 
   async hierarchy(): Promise<UIElement[]> {
-    const raw = (await this.rpc.call('getAccessibilityTree', { maxElements: 200 })) as {
+    const raw = (await this.rpc.call('getAccessibilityTree', { maxElements: this.maxElements })) as {
       tree: AndroidHierarchyNode[];
+      truncated?: boolean;
     };
     // android-server returns a flat, visibility-less node list. Derive `visible`
     // from bounds and reconstruct containment so `describeElements` can prune the
     // same way it does for the natively-nested iOS tree.
     const display = displayBoundsFor(raw.tree);
     const flat = raw.tree.map((node) => toUIElement(node, display));
-    return reconstructHierarchy(flat);
+    const roots = reconstructHierarchy(flat) as HierarchyTree;
+    // The server reports `truncated` (v1.2.0+); older servers omit it, so fall
+    // back to "the node count hit the cap" as a conservative signal. Flag the
+    // returned tree so ElementNotFoundError diagnostics can hint at raising it.
+    if (raw.truncated === true || raw.tree.length >= this.maxElements) {
+      roots.truncated = true;
+      roots.maxElements = this.maxElements;
+    }
+    return roots;
   }
 
   async openUrl(url: string): Promise<void> {
@@ -143,8 +168,24 @@ export class AndroidDriver implements Driver {
     if (permissions === '*') {
       const { stdout } = await adbShell(this.serial, ['dumpsys', 'package', packageName]);
       const declared = parseRequestedPermissions(stdout);
+      // Attempt every declared permission, then surface the ones that failed as
+      // a single aggregated error instead of silently swallowing each. Many
+      // declared permissions are not runtime-grantable (normal/signature), so a
+      // partial failure is common and non-fatal on its own — but a caller that
+      // needs a specific grant should still learn it didn't take.
+      const failures: string[] = [];
       for (const perm of declared) {
-        await adbShell(this.serial, ['pm', 'grant', packageName, perm]).catch(() => {});
+        try {
+          await adbShell(this.serial, ['pm', 'grant', packageName, perm]);
+        } catch (err) {
+          failures.push(`${perm}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+      if (failures.length > 0) {
+        throw new Error(
+          `grantPermissions('*') failed for ${failures.length}/${declared.length} permission(s) on ${packageName}:\n` +
+            failures.map((f) => `  ${f}`).join('\n'),
+        );
       }
       return;
     }

@@ -1,4 +1,4 @@
-import type { ElementNotFoundDiagnostics, Selector, UIElement } from '../types';
+import type { ElementNotFoundDiagnostics, HierarchyTree, Selector, UIElement } from '../types';
 import { centerOf, elementMatches, flattenTree, rankNearMisses } from './matcher';
 
 /**
@@ -122,5 +122,11 @@ export function buildElementNotFoundDiagnostics(
 
   const diag: ElementNotFoundDiagnostics = { candidates, matchedCount };
   if (candidates.length === 0) diag.screen = renderScreenDump(tree, SCREEN_CAP);
+
+  const t = tree as HierarchyTree;
+  if (t.truncated) {
+    diag.truncated = true;
+    if (t.maxElements !== undefined) diag.maxElements = t.maxElements;
+  }
   return diag;
 }

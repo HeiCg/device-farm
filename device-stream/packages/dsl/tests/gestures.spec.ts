@@ -15,6 +15,7 @@ function fakeDriver(over: Partial<Driver> = {}): Driver {
     tap: vi.fn(async () => {}),
     longPress: vi.fn(async () => {}),
     typeText: vi.fn(async () => {}),
+    clearText: vi.fn(async () => {}),
     pressKey: vi.fn(async () => {}),
     swipe: vi.fn(async () => {}),
     screenSize: vi.fn(async () => ({ width: 400, height: 800 })),

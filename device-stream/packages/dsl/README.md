@@ -77,6 +77,8 @@ interface SessionOptions {
   wdaSessionId?: string;              // reuse an existing WDA session
   defaultTimeoutMs?: number;          // default 10000
   pollIntervalMs?: number;            // default 250
+  androidMaxElements?: number;        // Android only, hierarchy() element cap, default 500
+  wdaTimeoutMs?: number;              // iOS only, per-request WDA HTTP timeout, default 30000
 }
 ```
 
@@ -116,14 +118,14 @@ await ds.get({ text: 'Submit', visible: true }).tap();        // only if visible
 | `openUrl(url)` | `am start VIEW -d` | `simctl openurl` | ❌ |
 | `openDownloads()` | intent to `/Download` doc | ❌ | ❌ |
 | `pressKey(key)` | `/key` keycode | WDA `pressButton` / `homescreen` | same |
-| `screenshot()` | `/screenshot` JPEG | WDA b64 | same |
-| `hierarchy()` | `/hierarchy` JSON parsed → `UIElement[]` | WDA XML parsed | same |
+| `screenshot({scale?})` | `/screenshot` JPEG, downscaled capture-side by `scale` | WDA b64 (full-res; `scale` ignored) | same |
+| `hierarchy()` | `/hierarchy` JSON parsed → `UIElement[]` (capped at `androidMaxElements`, default 500) | WDA XML parsed | same |
 | `get(selector)` → `ElementHandle` | hierarchy → bounds → resolve | same | same |
 | `tapOn(selector)` | resolve + `/tap` | resolve + WDA `actions` | same |
 | `swipe({fromX,fromY,toX,toY,durationMs?})` | `/swipe` (duration→steps) | WDA pointer `actions` | same |
 | `scroll(direction, opts?)` | swipe across screen (from `/info` size) | swipe across screen (WDA `/window/size`) | same |
 | `scrollUntilVisible(selector, opts?)` | scroll + settle + re-read until visible | same | same |
-| `waitForIdle(timeoutMs?)` | `/waitForIdle` | best-effort settle | same |
+| `waitForIdle(timeoutMs?)` | `/waitForIdle` | poll `/source` until two reads settle (honors `timeoutMs`) | same |
 | `describe()` / `describeText()` | pruned visible-only tree / indented outline | same | same |
 | `copyText(selector)` | hierarchy text | source XML value/label | same |
 | `awaitUntil(s).changeTo(t)` | poll `/hierarchy` | poll WDA `/source` | same |
@@ -135,6 +137,26 @@ await ds.get({ text: 'Submit', visible: true }).tap();        // only if visible
 | `setLocation(lat, lon)` | `adb emu geo fix` (emulator only) | `simctl location set` | ❌ |
 | `close()` | no-op | release WDA session | release WDA session |
 
+Platform notes:
+
+- **`setLocation(lat, lon)` on Android is emulator-only.** It runs `adb emu geo fix`,
+  which only reaches the emulator's geo console. Physical Android devices have no
+  general "set location" without an installed mock-location provider, so the call
+  will fail there.
+- **`screenshot({ scale })` is honored only on Android.** android-server downscales
+  the bitmap capture-side, so a low `scale` shrinks the JPEG before it leaves the
+  device. iOS/WDA returns a full-resolution PNG with no capture-time or host-side
+  downscale (no image library is bundled), so `scale < 1` is ignored on iOS and a
+  one-time warning is logged. Neither driver enforces a hard byte cap; callers that
+  need one enforce it after encoding.
+- **`clear()` never presses BACK.** Android clears the focused field via the
+  android-server `clearText` RPC; iOS via WDA's element `/clear`. (The earlier
+  implementation pressed BACK ~50×, which on Android dismissed the IME and walked
+  out of the app.)
+- **`hierarchy()` on Android is capped** at `androidMaxElements` (default 500). When
+  a read hits the cap the tree is flagged truncated and `ElementNotFoundError`
+  diagnostics hint at raising it via `SessionOptions.androidMaxElements`.
+
 ### `ElementHandle`
 
 Chainable handle returned by `ds.get(selector)`. Implements `PromiseLike<UIElement>` so you can `await ds.get(s)` to materialize the element.
@@ -144,7 +166,7 @@ interface ElementHandle extends PromiseLike<UIElement> {
   fill(text: string): Promise<void>;          // tap + typeText
   tap(): Promise<void>;
   longPress(durationMs?: number): Promise<void>;
-  clear(): Promise<void>;                     // best-effort
+  clear(): Promise<void>;                     // tap + clear focused field (never BACK)
   text(): Promise<string>;
   exists(): Promise<boolean>;
   waitFor(opts?: { timeoutMs?: number }): Promise<UIElement>;
