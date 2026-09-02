@@ -17,13 +17,30 @@ object NodeSerializer {
         return classNameCache.getOrPut(fullName) { fullName.substringAfterLast('.') }
     }
 
+    /** A serialized tree plus whether traversal was cut short by `maxElements`. */
+    data class SerializedTree(val elements: JSONArray, val truncated: Boolean)
+
+    /** Mutable holder threaded through the recursion to flag truncation. */
+    private class TraversalState {
+        var truncated = false
+    }
+
     /**
      * Serialize the accessibility tree starting from rootNode.
      * Returns a JSONArray of IndexedElement objects (1-indexed).
      */
     fun serialize(rootNode: AccessibilityNodeInfo, maxElements: Int = 50): JSONArray {
+        return serializeTree(rootNode, maxElements).elements
+    }
+
+    /**
+     * Like {@link serialize} but also reports whether the `maxElements` cap cut
+     * traversal short, so callers can tell clients the tree may be incomplete.
+     */
+    fun serializeTree(rootNode: AccessibilityNodeInfo, maxElements: Int = 50): SerializedTree {
         val elements = mutableListOf<JSONObject>()
-        traverse(rootNode, elements, maxElements)
+        val state = TraversalState()
+        traverse(rootNode, elements, maxElements, state)
 
         // Apply 1-based indexing
         val result = JSONArray()
@@ -31,15 +48,19 @@ object NodeSerializer {
             element.put("index", i + 1)
             result.put(element)
         }
-        return result
+        return SerializedTree(result, state.truncated)
     }
 
     private fun traverse(
         node: AccessibilityNodeInfo,
         elements: MutableList<JSONObject>,
-        maxElements: Int
+        maxElements: Int,
+        state: TraversalState
     ) {
-        if (elements.size >= maxElements) return
+        if (elements.size >= maxElements) {
+            state.truncated = true
+            return
+        }
 
         // Emit-filter: keep meaningful nodes, but ALWAYS recurse. A skippable
         // node (e.g. the id-less root FrameLayout) carries meaningful
@@ -51,10 +72,13 @@ object NodeSerializer {
 
         // Recurse into children
         for (i in 0 until node.childCount) {
-            if (elements.size >= maxElements) break
+            if (elements.size >= maxElements) {
+                state.truncated = true
+                break
+            }
             val child = node.getChild(i) ?: continue
             try {
-                traverse(child, elements, maxElements)
+                traverse(child, elements, maxElements, state)
             } finally {
                 child.recycle()
             }

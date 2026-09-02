@@ -22,8 +22,13 @@ class HierarchyHandler(
             ?: throw RuntimeException("No active window")
 
         try {
-            val elements = NodeSerializer.serialize(rootNode, maxElements)
-            return JSONObject().apply { put("tree", elements) }
+            val serialized = NodeSerializer.serializeTree(rootNode, maxElements)
+            return JSONObject().apply {
+                put("tree", serialized.elements)
+                // Signal when the tree was cut short at `maxElements` so clients
+                // can warn / raise the cap instead of silently missing nodes.
+                put("truncated", serialized.truncated)
+            }
         } finally {
             rootNode.recycle()
         }
