@@ -34,6 +34,18 @@ Deferred from Phase A: switch the open-path poll loop in
 existing poll loop as fallback; keep trust/cause semantics. Unit tests with
 mocked client.
 
+## 4. Phase B leftovers (same branch, after rebase)
+- Store the device `version` (and `stateHash`) on the live `ScreenNode` at
+  observation time so the compact tier's "only text changed" path can call
+  `diff(sinceVersion)` and patch instead of refreshing; also populate
+  `changedSince` in the live summary.
+- Thread `secretsUsed` from paste/keyboard callers into
+  `recordObservation` so redaction fires live; expose `isPassword` as a
+  flag bit from the Kotlin serializer (bit 6 = 64, matching `FLAG_PASSWORD`
+  in TS) and honour it in the store.
+- `navigate-to`: before a coordinate-bucket tap (no id/text stored), run
+  `query` for the stored index entry and skip/diverge if not present.
+
 ## Tests
 Vitest: outcome shapes with `settled`/`firstEventMs`; awaitChange settle
 option; await-ui-element uses awaitChange when flag on. Kotlin builds.
