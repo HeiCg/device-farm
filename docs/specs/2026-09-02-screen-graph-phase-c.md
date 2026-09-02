@@ -1,7 +1,9 @@
 # Ticket: Screen-graph Phase C — evaluation harness (cold/warm, tokens/step, RTT)
 
 Design: `2026-09-02-screen-graph-architecture.md` §4; hypotheses H1–H4.
-Depends on Phase A + B in the fork worktree `argent-sg` (feat/screen-graph).
+Depends on Phase A + B + A.1 in the ARGENT FORK worktree (not device-farm):
+`/private/tmp/claude-501/-Users-heicg-Desktop-projects-device-farm-device-stream/f494020d-4d6d-4533-9918-a025d7c363ad/scratchpad/argent-sg`
+(branch `feat/screen-graph`, remote HeiCg/argent).
 Bench baseline script exists: `packages/tool-server/scripts/bench-open-vs-proprietary.ts`
 (argent-p3; will be on feat/android-open-server after phase 3 lands —
 rebase feat/screen-graph on it first). Emulator `bench-api35` only when

@@ -1,7 +1,11 @@
 # Ticket: Screen-graph Phase A.1 — outcome settle heuristic + rebase onto phase 3
 
-Worktree `argent-sg`, branch `feat/screen-graph`. Run AFTER Phase B has
-committed (check `git log`), then:
+Repo: the ARGENT FORK (github.com/HeiCg/argent), NOT device-farm. Worktree
+absolute path:
+`/private/tmp/claude-501/-Users-heicg-Desktop-projects-device-farm-device-stream/f494020d-4d6d-4533-9918-a025d7c363ad/scratchpad/argent-sg`
+(branch `feat/screen-graph` @ 4f2bb38d, pushed to origin = HeiCg/argent;
+`origin/feat/android-open-server` @ dd378ddf is fetchable there). Phase B
+has committed. Run `git -C <path> fetch origin` first, then:
 
 ## 1. Rebase
 `git rebase origin/feat/android-open-server` (phase 3 @ dd378ddf: nested
