@@ -5,9 +5,25 @@ Depends on Phase A + B + A.1 in the ARGENT FORK worktree (not device-farm):
 `/private/tmp/claude-501/-Users-heicg-Desktop-projects-device-farm-device-stream/f494020d-4d6d-4533-9918-a025d7c363ad/scratchpad/argent-sg`
 (branch `feat/screen-graph`, remote HeiCg/argent).
 Bench baseline script exists: `packages/tool-server/scripts/bench-open-vs-proprietary.ts`
-(argent-p3; will be on feat/android-open-server after phase 3 lands —
-rebase feat/screen-graph on it first). Emulator `bench-api35` only when
-told free; never the physical device `ZF524RZBHD`.
+on `origin/feat/android-open-server` after phase 3b lands (like-for-like
+tap hold / pinch duration / final-UP sync / real-clock MotionInjector /
+unified describe+await tree — see
+`2026-09-02-open-server-phase3b-honest.md` and results-v3). FIRST:
+`git fetch origin && git rebase origin/feat/android-open-server` in the
+argent-sg worktree, resolve conflicts keeping both phase-3b fixes and
+screen-graph behaviour, bump versionCode above the 3b one, full tool-server
+vitest green, APK builds. B2 baseline numbers must come from the v3 report
+(the v2 gesture "wins" were retracted as hold/duration artifacts — do not
+cite them). Emulator `bench-api35` only when free (check `adb devices`;
+boot with `-grpc 8554 -grpc-use-token`); never the physical device
+`ZF524RZBHD`.
+
+Additional required measurements (from the adversarial review of phase 3):
+- Every config must assert hold/duration parity in the script itself
+  (same `holdMs`, same `durationMs` on both backends) and fail loudly if
+  a config deviates.
+- Report per-verb ranges across the 3 repetitions, not single p50s.
+- Tokens with `js-tiktoken` o200k_base (primary) and chars/4 (secondary).
 
 ## Configurations
 B1 argent proprietary (flag off, vendored 0.22.1 binaries as in the baseline
