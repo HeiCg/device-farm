@@ -253,3 +253,156 @@ OPEN_SERVER_DEVICE_TESTS=1 OPEN_SERVER_DEVICE_SERIAL=emulator-5554 \
 ```
 
 The emulator was torn down at the end of the run.
+
+---
+
+# v5 / phase 3d: describe idle-policy parity (tap+describe)
+
+Executes `2026-09-02-open-server-phase3d-describe-idle-policy.md` on the ARGENT
+fork, branch `feat/android-open-server @ 9d0a9ccf` (phase 3c). Commit is local, not
+pushed. Re-benched on the **same** AVD `bench-api35` (`-grpc 8554 -grpc-use-token`,
+serial `emulator-5554`; `ZF524RZBHD` never targeted), N=20, WARMUP=3, blocks
+OFF-1 → ON → OFF-2. Open server rebuilt to **0.1.14 / versionCode 16** from the
+committed Kotlin (unchanged — the APK was absent in this fresh checkout, rebuilt
+identical). Proprietary path via the downloaded vendored binaries. **0 masked
+fallbacks / 0 errors across all blocks**; `describe.source` = `android-devtools`
+every OFF block, `open-device-server` every ON block.
+
+## What changed (TS-only)
+
+- **`tools/describe/platforms/android/index.ts`** — open branch now defaults to an
+  **immediate** read (`getNestedState({ waitTimeoutMs: 0 })`), matching the
+  proprietary `android-devtools` `getHierarchy` policy. New `settle?: boolean |
+  number` maps to the idle-quiescence window via `settleToWaitTimeoutMs`
+  (absent/`false`/0/negative/NaN → 0; `true` → 500; positive number → floor). The
+  settled read stays available explicitly. `waitedMs`/`captureMs` still ride the
+  result metadata.
+- **`tools/describe/index.ts`** — describe tool schema gains `settle` (one-sentence
+  doc), threaded to `describeAndroid`.
+- **`bench-open-vs-proprietary.ts`** — tap+describe runs both `settle:false`
+  (like-for-like) and `settle:true` (our policy) for ON, OFF as-is; new
+  destination-visible staleness probe (derives a nav target + destination-only
+  markers live, then measures the post-tap destination-visible rate per policy).
+- **`open-server-await-getstate.test.ts`** — updated for the new default; added
+  settle-policy coverage.
+- **`argent-device-interact/SKILL.md`** — states the default matches the
+  proprietary path and documents `settle`.
+- `await-ui-element` / `await-screen-idle` left untouched (item 4).
+- **No Kotlin / APK change.** Verified empirically that `uiDevice.waitForIdle(0)`
+  returns immediately: the ON `settle:false` describe reports **`waitedMs` p50 = 0**
+  on a freshly-navigated screen (a 0 window short-circuits the idle loop).
+
+## tap+describe triple — p50 / p95 / max (ms), N=20
+
+| Config | tap+describe | note |
+|---|---|---|
+| OFF-1 (prop, as-is) | **129 / 701 / 704** | bimodal: mostly fast+stale, a ~700 ms tail when it waits out the settle |
+| OFF-2 (prop, as-is) | **148 / 677 / 733** | same shape (drift within block) |
+| **ON settle:false** (like-for-like) | **286 / 348 / 398** | idle gate gone (`waitedMs` 0); tighter tail |
+| **ON settle:true** (our policy) | **684 / 736 / 846** | enforced ~500 ms quiescence (`waitedMs` p50 714) |
+
+### describe idle-gate vs. capture split after a navigating tap (open path, p50)
+
+| Scenario | waitedMs | captureMs | n |
+|---|---|---|---|
+| ON, idle Settings root | 0 | 18 | 10 |
+| ON, right after a tap, `settle:false` (default) | **0** | **179** | 10 |
+
+The idle gate the v4 miss was made of (waited 519 @ the old 500 cap) is **gone** —
+`waitedMs` is now 0. The residual in `settle:false` tap+describe is the open path's
+nested **multi-window serialization of the transitional tree** (capture ~179 ms
+mid-animation, vs ~18 ms on a settled/idle screen and vs the proprietary
+`getHierarchy` ~76 ms): reading mid-navigation, the accessibility tree transiently
+carries the outgoing + incoming windows, which the nested serializer walks in full.
+
+## Destination-visible (staleness) rates — N=20
+
+After a navigating tap into **"Network & internet"** (nav target + 11
+destination-only markers derived live from the device under each flag), does the
+*immediate* describe already contain the destination screen's content?
+
+| Policy | destination-visible | rate | `waitedMs` p50 |
+|---|---|---|---|
+| **OFF** (prop `getHierarchy`, `waitForIdleMs:500`) | 5/20 (OFF-1), 3/20 (OFF-2) | **0.25 / 0.15** | n/a (no split) |
+| **ON `settle:false`** (immediate) | 0/20 | **0.00** | 0 |
+| **ON `settle:true`** (settled) | 20/20 | **1.00** | 714 |
+
+**Answer to item 2 — what `android-devtools.ts:335 waitForIdleMs:500` does in the
+bench path.** It is a **capped/bounded idle wait, not an enforced quiescence**. The
+tell is OFF's bimodal latency (p50 129 / p95 ~700) paired with a 15–25 %
+destination-visible rate: on most runs the bounded wait expires before this
+navigation settles → a fast, **stale** pre-settle tree (75–85 %); on a minority it
+waits out the settle → the ~700 ms tail, a fresh tree (15–25 %). So the proprietary
+default sits on the *immediate* side of the policy axis — same family as ON
+`settle:false` (strict immediate, 0 % fresh) — and well short of ON `settle:true`
+(enforced quiescence, 100 % fresh). The two backends differ in **policy**, and the
+settled read is the strictly superior product feature (100 % fresh vs the
+proprietary 15–25 %), now available explicitly.
+
+## Other verbs (p50 / p95 / max, ms) — unchanged from v4, sanity check
+
+| Verb | OFF-1 | ON | OFF-2 |
+|---|---|---|---|
+| describe (idle Settings root) | 79 / 86 / 87 | 77 / 81 / 89 | 76 / 78 / 80 |
+| gesture-tap | 53 / 54 / 55 | 60 / 65 / 72 | 53 / 55 / 63 |
+| gesture-swipe (250 ms) | 296 / 302 / 306 | 277 / 282 / 288 | 298 / 302 / 305 |
+| await-screen-idle | 514 / 523 / 528 | 508 / 526 / 1067 | 512 / 525 / 525 |
+| await-ui-element | 76 / 80 / 80 | 76 / 80 / 83 | 76 / 85 / 88 |
+| paste | 82 / 99 / 101 | 90 / 121 / 166 | 77 / 102 / 103 |
+| gesture-pinch (300 ms) | 356 / 379 / 383 | 327 / 344 / 347 | 354 / 360 / 369 |
+
+Idle-root describe ≈ equal (77 vs 79/76). Token parity holds: **657 / 657**
+(o200k_base), raw Jaccard **1.000**, 14 elements both. Screenshot dims unchanged
+(OFF 270×600 / 69 KB vs ON 1080×2400 / 135 KB). Host RSS: OFF ~62 MB
+`simulator-server`, ON 0 host process.
+
+## Targets — measured, p50
+
+| Target | Result | Status |
+|---|---|---|
+| tap+describe ON(settle:false) ≤ 1.2× OFF | 286 vs ~138 = **~2.07×** | **MISS — reported** |
+| ON(settle:true) reported with staleness benefit | 100 % destination-visible (vs OFF 15–25 %, settle:false 0 %); no latency target | **PASS** |
+| Token parity / goldens / fallbacks unchanged; suite green; APK unchanged | 657=657, Jaccard 1.0; 0/0 fallbacks/errors; 4934 passed / 13 skipped / 0 failed; APK 0.1.14 vCode 16 (rebuilt identical) | **PASS** |
+
+The 1.2× miss is **honest and isolated, not a masked fallback**: the idle gate this
+ticket removed *is* removed (`waitedMs` 0). What remains is the open path's nested
+serialization of the **transitional** multi-window tree captured mid-animation
+(~179 ms vs the proprietary `getHierarchy` ~76 ms) — a serialization cost on a
+busy in-flight screen, outside this ticket's idle-policy scope. Crucially the
+comparison is now **policy-matched**: OFF and ON `settle:false` are both immediate
+(stale) reads, so the residual is a like-for-like serialization delta, and the
+settled read (ON `settle:true`) delivers a strictly fresher tree than the
+proprietary default (100 % vs 15–25 %).
+
+## Tests
+
+- **tool-server suite:** `vitest run` → **4934 passed / 13 skipped / 0 failed**
+  (386 files). `open-server-await-getstate` updated: default describe now issues one
+  `getNestedState({ waitTimeoutMs: 0 })` (never the two-call path); `settle:false`→0,
+  `settle:true`→500, `settle:<n>`→n; `settleToWaitTimeoutMs` edge cases
+  (absent/false/0/negative/NaN → 0, true → 500, positive → floor).
+- **type-check:** `tsc --noEmit` (package `tsconfig.json`) and `typecheck:tests`
+  (`tsconfig.test.json`) both clean; the bench script transpiles clean.
+- **device (bench):** N=20, 0 fallbacks / 0 errors / 0 masked fallbacks over the
+  three blocks; `describe.source` correct per block.
+
+## Deviations
+
+1. **No worktree.** Unlike v4, the ticket's checkout was clean and idle (no
+   concurrent agent), so work + the local commit land directly on
+   `feat/android-open-server @ 9d0a9ccf`.
+2. **`BENCH_COLD=0`.** Cold-start is unchanged by this TS idle-policy change and is
+   out of the v5 deliverable (tap+describe triple + staleness), so the cold-spawn
+   loop was skipped to shorten the run.
+3. **APK rebuilt (identical).** The 0.1.14 / vCode 16 APK was absent in this fresh
+   checkout; rebuilt from the committed Kotlin (same versionCode) — so "APK
+   unchanged" holds. No Kotlin edit; `waitForIdle(0)`-returns-immediately verified
+   empirically (`waitedMs` 0).
+4. **await-* fallback reads immediately.** `describeAndroid`'s new default is
+   immediate, so the await-* tools' *rare* `describeAndroid` fallback now reads
+   immediately per-poll instead of the phase-3c 500 ms settle. Their primary path
+   (`describeAndroidViaOpenState`, `getNestedState()` 2000 ms) and poll timeouts are
+   untouched (item 4); a per-tick immediate read is the correct behaviour for a
+   poll loop.
+5. **Staleness target derived live** ("Network & internet", 11 markers) rather than
+   hardcoded, so the probe is robust across API levels / Settings layouts.
