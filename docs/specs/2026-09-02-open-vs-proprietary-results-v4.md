@@ -941,3 +941,191 @@ Trim goldens unchanged.
   indicated levers but were left for a cut phase.
 - Pre-existing, not touched (reported): three unused `no-console` eslint-disable
   directives in `android-open-server.ts` (phase 3f fast-inject block).
+
+# v11 / phase 3j: serialize once, compact payload, transport experiment
+
+ARGENT FORK. Code branch `feat/android-open-server-p3j` (from `-p3i`); CI branch
+`feat/bench-ci-3j` (merge commit `8ecc9f46`). Run **33807101442** (workflow_dispatch,
+`feat/bench-ci-3j`, ubuntu-latest x86_64 KVM, Android 14 / SDK 34, 1080x2400, N=20,
+warmup 3, cold 3). Server APK bumped 0.1.19/23 → 0.1.20/24. Every before/after below
+is measured by the SAME method in the SAME run via an in-server toggle, not across
+runs. Numbers name statistic/block/N/run id; a target is not a result.
+
+## Headline: same-run idle describe, all four blocks (run 33807101442, N=20)
+
+| metric | OFF-1 | ON-uiautomation | ON-scrcpy | OFF-2 |
+|---|---|---|---|---|
+| describe idle p50/p95 ms | 52/53 | **45/85** | **46/50** | 52/64 |
+| describe bytes | 1892 | 1894 | 1894 | 1892 |
+| tokens o200k (1 sample) | 657 | 657 | 657 | 657 |
+| describe source | android-devtools | open-device-server | open-device-server | android-devtools |
+
+**ON idle describe p50 ≤ OFF is met** (ON-uia 45 ≤ 52; ON-scrcpy 46 ≤ 52) — the
+phase-3i target, now hit in the same run without cross-run inference. Fidelity
+Jaccard(id+text) OFF-1 vs ON-uia = **1.0** on 17 keys; tokens identical 657 across
+all four blocks. ON-uia p95 (85) is still above OFF p95 (53): that tail is the
+intermittent host-recv gap (see the transport experiment) — it lands on ~p95, not
+p50 (adb-forward recvMs p50/p95 = 0/40 this run, not a fixed per-request 40 ms as
+the earlier single-sample decomposition read it).
+
+## Item 1 — serialize once (ON, N=20, run 33807101442, in-run A/B)
+
+The handler serialized the tree twice: `hierarchy.toString()` to time `encodeMs`
+(discarded), then `successResponse` re-serialized the whole tree. Now the tree is
+serialized ONCE into a string that `JsonRpcHandler` splices verbatim over a
+placeholder in the finished response, so `successResponse` never re-encodes it.
+`_benchLegacyEncode:true` forces the old double-encode for the A/B; both arms hold
+`compact:true`.
+
+| metric (p50/p95 ms) | legacy double-encode (before) | serialize once (after) |
+|---|---|---|
+| server handleMs (t3−t2), ON-uia | 49.9/57.3 | 31.5/39.2 |
+| server handleMs (t3−t2), ON-scrcpy | 34.2/181.1 | 22.4/26.0 |
+| host RTT, ON-uia | 52.2/92.6 | 34.4/81.3 |
+
+−18 ms on server handle p50 (ON-uia); the eliminated `successResponse` re-encode
+is the whole saving. `encodeMs` stays the single-pass cost (~12 ms on this tree)
+and its output is what ships. Wire bytes unchanged by this cut (14967 both arms) —
+serialize-once is CPU, not payload.
+
+## Item 2 — compact payload (ON, N=20, run 33807101442, in-run A/B)
+
+`compact:true` drops, on the device before serializing, the nodes the host v2 trim
+discards anyway: scaffold layout / decorative-ImageView wrappers it passes through
+(children hoisted) and zero-area empty leaves it drops. Conservative and
+output-preserving; the host lowering is byte-identical for compact vs full (golden
+`open-server-trim-golden.test.ts`, on the plain / dialog+IME fixtures and the
+committed real capture). Both arms hold serialize-once.
+
+| metric (p50/p95) | compact off (before) | compact on (after) |
+|---|---|---|
+| wireBytes, ON-uia | 31888/31889 | 14966/14967 |
+| wireBytes, ON-scrcpy | 31888/31888 | 14966/14966 |
+| server encodeMs ms, ON-uia | 18/23 | 7/10 |
+| server handleMs ms, ON-uia | 30.6/38.8 | 23.3/34.3 |
+| host RTT ms, ON-uia | 73.2/81.3 | 24.8/79.3 |
+
+**Wire −53% (31888 → 14966 B, ON-uia p50).** Serialize time roughly halves
+(encodeMs 18 → 7). Tokens and rendered describe unchanged (657, Jaccard 1.0). The
+big host-RTT p50 drop (73 → 25) is the smaller payload combined with the recv gap
+missing the median this sample; the RTT p95 (81 → 79) shows the gap still on the
+tail. Describe uses compact by default; `compact:false` remains for raw dumps.
+
+## Item 3 — transport experiment (ON, N=20 per arm, run 33807101442)
+
+Three transports for the same `getNestedState`, one run. `redir` needs a routable
+listener, so the server was spawned with a gated second `0.0.0.0` bind
+(`ARGENT_OPEN_SERVER_BIND_ALL=1`, CI-only); `_padTo:1448` pads the reply to a full
+MSS multiple (never shipped).
+
+ON-uiautomation:
+
+| arm | rttMs p50/p95 | recvMs p50/p95 | wireB p50 |
+|---|---|---|---|
+| adb-forward (baseline) | 24.9/70.3 | 0/40.4 | 14966 |
+| redir (emulator console) | 25.7/57.9 | **0.24/0.86** | 14964 |
+| adb-forward +pad1448 | 19.7/59.0 | 0/40.2 | 15927 |
+
+ON-scrcpy:
+
+| arm | rttMs p50/p95 | recvMs p50/p95 | wireB p50 |
+|---|---|---|---|
+| adb-forward (baseline) | 20.5/62.6 | 0/40.7 | 14966 |
+| redir (emulator console) | 19.6/21.1 | **0.21/0.34** | 14964 |
+| adb-forward +pad1448 | 20.7/60.9 | 0/40.9 | 15927 |
+
+**Finding: `redir` removes the recv gap entirely** (recvMs p95 40 → ~0.5), and with
+it the RTT tail (ON-scrcpy rtt p95 62.6 → 21.1). **Padding does NOT remove it**
+(recvMs p95 still 40 with the reply MSS-aligned). So the ~40 ms tail is NOT a
+delayed-ACK stall on the last partial segment of OUR receiving socket (padding to a
+full MSS would have cleared that); it is the host `adb server` on the forward hop.
+`redir` bypasses adbd and the adb server (last hop is qemu slirp) and has none of it.
+
+`ping` p50/p95 = 1.29/1.47 ms (ON-uia, N=20): the socket/dispatch floor is ~1 ms,
+so the tail is the adb-forward reply hop, not the round-trip itself.
+
+## Same-sample decomposition, after (ON-uia idle, N=20, run 33807101442)
+
+The describe idle loop and its stage split are one N=20 sample. `hostRecvMs` p50 0
+confirms the gap is intermittent (p95 40).
+
+| stage | idle p50/p95 | after-tap p50/p95 (n=10) |
+|---|---|---|
+| idleMs | 0/1 | 1/12 |
+| rootMs | 1/1 | 200/304 |
+| rootsMs | 1/2 | 137/235 |
+| serializeMs | 12/13 | 31/229 |
+| encodeMs | 26/27 | 10/35 |
+| hostParseMs | 0.16/0.20 | 0.19/0.99 |
+| hostRenderMs | 0.46/0.76 | 0.44/7.96 |
+| hostTtfbMs | 43.3/45.1 | 436/651 |
+| hostRecvMs | 0/40.4 | 0/42.8 |
+| hostRttMs | 43.4/84.2 | 439/651 |
+| prevServerHandleMs | 42.2/44.0 | 12.4/198.5 |
+| wireBytes | 14966 | 14970 |
+
+The after-tap capture (captureP50 422 ms) is dominated by the transitional
+`rootMs` (200) + `rootsMs` (137) binder reads while the post-navigation window
+settles — unchanged by phase 3j, which only touches serialize/compact/transport.
+The idle-loop `encodeMs` (26) reads higher than the warmed A/B (`compact on`
+encodeMs 7): the idle loop runs first, before the on-device server's JIT warms;
+the back-to-back A/B is the steadier before/after for the cuts.
+
+## Verbs — no regression, ON-scrcpy still fastest tap (run 33807101442)
+
+gesture-tap p50: ON-scrcpy 51, ON-uia 77, OFF-1 53 — ON-scrcpy beats both.
+tap+describe(settle:false) ON-uia 516/781, ON-scrcpy 401/711; (settle:true) ON-uia
+597/992, ON-scrcpy 430/675. OFF-1 vs OFF-2 idle-describe drift 0 ms p50 (52/52);
+paste drifts 759 → 553 (proprietary-path runner noise). ON-scrcpy fast-inject
+fallbacks = 0 (the merge gate would have failed otherwise).
+
+## Adversarial review / caveats
+
+- **In-run A/B, not cross-run.** Each cut's before/after is one toggle on the same
+  device in the same run (the phase-3i reviewer's rejection of cross-run A/B is
+  addressed). Items 1 and 2 are factorial (item 1 holds compact:true, item 2 holds
+  serialize-once); the fully-unoptimised (compact:false + legacy-encode) combo was
+  not measured as a single pair.
+- **x86_64/KVM only.** Not comparable to local arm64/HVF; only OFF-vs-ON within
+  this run is like-for-like.
+- **Goldens byte-identical** proven by the host unit goldens locally (`compact` vs
+  non-compact lower to the identical DescribeNode on the plain/dialog+IME fixtures
+  and the committed real capture; 126 → 78 nodes, ~31% smaller on that fixture,
+  ~53% on the real device tree) and on-device by tokens 657 + Jaccard 1.0. The
+  bench workflow does not run the unit goldens (unit-tests.yml is main-only).
+- **redir bind is gated.** The `0.0.0.0` listener is CI-only
+  (`ARGENT_OPEN_SERVER_BIND_ALL=1`); the shipped server still binds loopback-only.
+
+## Recommended next step (3d, condition met, needs a bind decision)
+
+The experiment's condition — "if redir removes the gap, make it the default
+transport for emulators" — is met (recv gap 40 → ~0.5 ms p95). Shipping it means
+the emulator server binds a routable interface in production so the console `redir`
+can reach it; the current loopback-only bind is a deliberate security choice, so
+flipping the default is a planner call, not an autonomous implementor flip. The
+`transport` describe metadata field and the whole redir path are already in place
+behind the gate. Scoped to `emulator-NNNN` serials with adb-forward fallback for
+physical devices, the exposure is host-local (the emulator's network is NAT'd to
+host loopback).
+
+## CI gate fix (proven this run)
+
+Run 33792592764 finished "success" with 4/17 device tests failing: the device-test
+step ran `vitest … | tee` with no `pipefail`, so the pipeline exited with tee's 0,
+`continue-on-error` recorded `outcome=success`, and the final
+`steps.devtest.outcome == 'failure'` gate was dead. Fixed by `set -o pipefail` on
+that step (the implicit GH `run` shell is `bash -e {0}`, no pipefail). Run
+33807101442 concluded **failure** with the ONLY failing step being "Fail the job if
+device tests failed" — the gate fired. The 3 device-test failures are unrelated to
+phase 3j (paste `typeText` 10 s timeout; two scrcpy fast-inject tests — the known
+fast-inject issues tracked on the 3h branch); the describe / getState device tests
+passed. Red job, green bench, as designed.
+
+## Tests / build
+
+Kotlin unit goldens `NodeSerializerCompactTest` (compact drop predicates) +
+`NestedWindowSerializerTest` pass (`./gradlew testDebugUnitTest`); APK assembles
+(versionCode 24). Host `tsc --build` clean; the bench script typechecks; affected
+vitest suites 451 passed (describe / open-server / await / parser / host-bench),
+including the new compact-equivalence goldens. The bench captured a fresh
+`real-nested-reply.json` into the artifact.
