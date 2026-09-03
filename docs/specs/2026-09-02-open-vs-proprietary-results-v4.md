@@ -761,3 +761,183 @@ device run; the bench already emits these verbs and the stage table alongside.
   moment the host is healthy and the AVD is free.
 - All code, unit tests, goldens and the APK build were completed offline first, as
   required.
+
+
+# v10 / phase 3i: decomposing the idle open describe (measured, not attributed)
+
+Branch `feat/android-open-server-p3i` (worktree `argent-p3i`), based on
+`feat/android-open-server` @ `d13cbec7` (phase 3g-b). CI arm `feat/bench-ci-3i`
+(`origin/feat/bench-ci` @ `be362dbd` + p3i). Server APK bumped to 0.1.19 /
+versionCode 23 (built offline: gradle assembleDebug OK). Two CI runs on the
+x86_64 / KVM hosted runner, N=20: **33781603888** (first 5-point timestamps) and
+**33784227150** (corrected sampling + adb-free describe path); the corrected run
+is authoritative. An earlier v10 draft attributed a ~90 ms "residual" to
+"adb-forward transfer + am-instrument dispatch" — that was a residual, not a
+measurement, and an adversarial review rejected it. It is corrected below with
+end-to-end timestamps.
+
+## Instrumentation added (no behaviour change, no cuts)
+
+Five monotonic timestamps per RPC: t1 host request-line flushed; t2 server handler
+entry; t3 server response ready; t4 server response written + flushed; t5 host last
+byte received. Host side (`android-open-server-client` + `ndjson-socket`) resolves
+`hostTtfbMs` (t1→first byte), `hostRecvMs` (first→last byte), `hostRttMs` (t1→t5),
+`hostParseMs`. Server side (`TCPServer` + `JsonRpcHandler`) reports (t3−t2, t4−t3,
+t4−t2) per method, piggybacked onto the next same-method reply. The bench times N
+back-to-back idle describes AND collects each one's stages + timeline, so the verb
+latency and the decomposition are the SAME 20 samples (the earlier split sampled a
+separate N=10 loop with an untimed reset between calls — not subtractable).
+
+## The hidden per-describe cost: three adb spawns (corrected)
+
+`describe` called `isAndroidTv` on every call → `getAndroidRuntimeKind` →
+`listAndroidSerials` (`adb devices`) + `readAvdName` (`adb shell getprop
+ro.boot.qemu.avd_name`) EVERY time; the memo cached only the pm-features verdict.
+So describe paid ~3 adb process spawns inside its timed window, OFF and ON alike —
+which is why it never showed in the OFF-vs-ON gap and got mis-attributed to
+transport. `isAndroidTvCached` returns the memoized form factor with zero spawns.
+
+**Measured on-device (run 33784227150, both configs):**
+
+| form-factor check | p50 ms |
+|---|---|
+| before (`isAndroidTv`, adb devices + getprop) | 25.3–27.5 |
+| after (`isAndroidTvCached`, cache-only) | 0.006 |
+
+~26 ms removed from every describe. OFF-1 describe dropped from 72–76 ms (earlier
+runs, with the spawns) to **52 ms** here.
+
+## Idle describe — OFF vs ON, p50 / p95 (ms), N=20, run 33784227150
+
+| block | describe p50/p95 | tokens |
+|---|---|---|
+| OFF-1 (android-devtools) | 52 / 55 | 657 |
+| ON-uiautomation (open-device-server) | 106 / 126 | 657 |
+| ON-scrcpy | 103 / 131 | 657 |
+| OFF-2 (android-devtools) | 52 / 56 | 657 |
+
+- tokens 657 in every block. ping p50 1.20 ms (uiautomation) / 1.37 ms (scrcpy).
+
+## Where the ON describe actually goes (same-sample decomposition, N=20)
+
+ON-uiautomation idle describe, run 33784227150. The verb (106 ms) ≈ the
+getNestedState RPC round-trip; adb spawns are now gone and host CPU is ~1 ms.
+
+| stage | p50 ms | note |
+|---|---|---|
+| host TTFB (t1→first byte) | 64 | ≈ server handle; first byte arrives when the server finishes |
+| host recv (first→last byte) | 40 | the 31 KB reply crossing `adb forward` |
+| **host round-trip (t1→t5)** | **104** | = the describe RPC |
+| host parse | 0.25 | |
+| host render (lower + v2 trim) | 0.59 | |
+| server capture (idle 0, root 1, windows 0, roots 1, serialize 8, **encode 26**) | 37 | tree walk + a FIRST JSON serialize that is measured then discarded |
+| server handle (t3−t2) | 64 | capture 37 + `successResponse` re-serialize of the 31 KB reply ~27 |
+| **server write + flush (t4−t3)** | **0.39** | the Kotlin writer is fine — NOT char-by-char |
+| server total (t2→t4) | 65 | handle 64 + write 0.4 |
+
+Cross-checked by the back-to-back `getNestedState` probe (warm): host round-trip 87,
+server handle 46, server write 0.39, host recv 40 — same shape.
+
+### Per-byte or per-request? Per-request.
+
+Comparing `getNestedState` (31 KB) to `getState`+screenshot (168 KB), same run:
+
+| | wireBytes | server write | host recv | server capture |
+|---|---|---|---|---|
+| getNestedState | 31 878 | 0.39 ms | 40 ms | 28–37 ms |
+| getState+screenshot | 167 956 | 1.5 ms | 41.5 ms | 88 ms (JPEG) |
+
+- **server write** ~9 ns/byte — negligible; the socket write is never the cost.
+- **host recv** is ~40 ms for BOTH payloads — the `adb forward` cost is a
+  fixed-per-request latency, not per-byte bandwidth (and it swings 0→40 ms with
+  runner contention; ping was 0.74 ms in run 33781603888 vs 1.2 ms here).
+- The server cost is CAPTURE + on-device JSON serialization, per request.
+
+## Two real cost centres (measured), and why the target swings
+
+1. **On-device JSON serialization of the 31 KB reply, done TWICE (~53 ms):** the
+   `encodeMs` 26 ms (a measurement — `hierarchy.toString()` discarded) plus the
+   real `successResponse.toString()` ~27 ms. Per-request server CPU, scales with
+   the tree.
+2. **adb-forward transport of the 31 KB reply (~0–40 ms):** a fixed-per-request
+   latency that varies with emulator/adb contention, not with payload size.
+
+NOT the residual: server socket write (0.4 ms), host parse+render (0.85 ms), the
+two-pass host lowering (0.09 ms offline), and — now removed — the ~26 ms adb spawns.
+
+## Target verdict — runner-variance-dependent
+
+Target: ON idle describe ≤ OFF + 10 ms on the same run; tokens + goldens
+byte-identical.
+
+- Tokens: **met** (657 = 657). Goldens: **met** (offline trim goldens pass).
+- Latency, run 33784227150 (contended emulator): OFF 52, ON 106 → **missed** by
+  44 ms (ON is OFF+54).
+- Latency, run 33781603888 (low-contention emulator, still with the adb spawns):
+  OFF 72, ON 63 → **met** (ON is below OFF).
+
+The pass/fail flips with runner contention because ON (the full 31 KB tree over
+`adb forward`, serialized twice on-device) and OFF (a small pre-trimmed payload
+over local gRPC) respond very differently to load. Closing it deterministically
+needs the server-side levers, deferred here under "no cuts": stop the double
+on-device serialization (~27 ms) and/or send a compacted payload (drop nodes/fields
+the v2 trim discards) to cut both the serialize and the transport. Host CPU, the
+socket write, and the two-pass lowering are not where the time is.
+
+## Cross-run caveat (not an A/B of the two cuts)
+
+The v9-era comparison 33743850196 → 33768547622 spans **six commits**: `d13cbec7`
+(3g-b: `StateHandler.kt`, `NestedWindowSerializer.kt`, `HierarchyHandler.kt`),
+`d008e89d`, `19e02f77`, `b5eaa119`, `35bfee24`, `4ecbe71e`. So it is NOT an A/B of
+the phase-3i TCP_NODELAY + flag-cache cuts — the `captureP50` 33 → 25 ms it showed
+is plausibly 3g-b (the active-root-from-windows-snapshot change), not the two cuts.
+Until the five-point timestamps existed (runs 33781603888 / 33784227150), the
+host-vs-transport split of the RPC was **unmeasured**; it is measured only from
+those two runs, not inferred from the earlier ones. Absolute describe latency is
+emulator-variance-dominated across runs (ON 120 / 63 / 106 ms in three runs of
+nearly the same code), so only OFF-vs-ON within one run is like-for-like, and even
+that swings with contention.
+
+## Observed regressions vs 33743850196 (unexplained)
+
+Noted for follow-up, not explained here, and inside the runner-variance envelope:
+tap+describe `settle:true` ON-uiautomation 540 → 825 ms with destination-visible
+12/20 → 9/20; gesture-tap p95 ON-scrcpy 54 → 88 ms. The per-verb drift floor is
+large — OFF-1 vs OFF-2 differ by ~129 ms p95 on tap+describe in the same run — so
+these are within noise until an isolated re-run says otherwise.
+
+## Review corrections (flag cache, micro-bench, workflow)
+
+- **Flag cache observes cross-process writes.** The epoch cache never saw a write
+  from another process, so `argent flags set open-device-server` (the `@argent/cli`
+  process) needed a tool-server restart — a regression. The cache now validates the
+  parsed map against `fs.statSync` mtime + size per call (~0.01 ms, no readFileSync
+  / no project-root walk when unchanged); the flags-cache test asserts the
+  cross-process write IS observed.
+- **Micro-bench:** the TOTAL host pipeline EXCLUDES o200k tokenization (describe
+  renders to text and never tokenizes) — TOTAL parse+lower+trim+render ≈ 0.16 ms
+  p50, tokenize ~0.30 ms is a separate informational row. The fixture is labelled
+  SYNTHETIC (~68% of a real ~31877 B wire reply). The CI bench now dumps one real
+  nested reply (`real-nested-reply.json`) into the artifact for a real fixture next
+  phase.
+- **Workflow:** `run_block`'s `node … | tee` no longer masks a bench failure as
+  green (`set -o pipefail`); the device-test step (`id: devtest`, continue-on-error
+  kept so artifacts still upload) is now gated by a final `if: always() &&
+  steps.devtest.outcome == 'failure'` step that fails the job AFTER upload (run
+  33768547622 hid 4/17 device-test failures).
+
+## Tests / build
+
+Full tool-server suite green; new/updated tests: `android-tv-discovery` asserts the
+describe form-factor check spawns no `execFile` when warm (and probes once cold);
+`android-open-server-client` asserts `requestWithStats` returns the reply's wire
+size + host timeline; `flags-cache` asserts a cross-process write is observed.
+`tsc --build` + `typecheck:bench-scripts` clean; APK compiles (versionCode 23).
+Trim goldens unchanged.
+
+## Deviations / out of scope (no cuts this phase)
+
+- Double on-device serialization and a server-side compact payload are the
+  indicated levers but were left for a cut phase.
+- Pre-existing, not touched (reported): three unused `no-console` eslint-disable
+  directives in `android-open-server.ts` (phase 3f fast-inject block).
