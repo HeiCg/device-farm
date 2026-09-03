@@ -79,6 +79,18 @@ fling A/B scrcpy vs UiAutomation: 2 of 4 informative cells at 0.44× and
 0.70× (fling fidelity NOT unchanged); block JSONs missing from this run's
 artifact (dot-dir excluded; fixed later).
 
+### 3g-b (run 33738386658, same CI environment, ON-uiautomation only — ON-scrcpy void, tap did not land)
+
+| stage / verb | before (33729614337) | after (3g-b, vc22) | OFF |
+|---|---|---|---|
+| rootMs after tap p50/p95 | 210/285 | **140/221** | n/a |
+| describe idle p50 | 132 | **108** | 72 |
+| tap+describe settle:false p50/p95 | — | 662/757 | 515/1155 (no settle variant) |
+
+Residual persists: `AccessibilityWindowInfo.getRoot()` still blocks ~140 ms
+mid-transition; idle describe still 36 ms over OFF, of which server stages
+are ≈22 ms total → the remaining ~90 ms is host/transport (phase 3i).
+
 ## Pending (blocked on host memory, then AVD queue C.1 → 3f → 3g)
 - 3f bench: OFF / ON-uiautomation / ON-scrcpy — tap tail and per-event
   inject cost with the scrcpy backend.
