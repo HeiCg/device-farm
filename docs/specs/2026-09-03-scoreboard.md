@@ -91,6 +91,22 @@ Residual persists: `AccessibilityWindowInfo.getRoot()` still blocks ~140 ms
 mid-transition; idle describe still 36 ms over OFF, of which server stages
 are ≈22 ms total → the remaining ~90 ms is host/transport (phase 3i).
 
+### CI run 5 (33743850196, same environment, complete artifacts) — confirms run 4
+
+| verb p50/p95 | OFF-1 | ON-uiautomation | ON-scrcpy | OFF-2 |
+|---|---|---|---|---|
+| gesture-swipe | 298/314 | 303/353 | **258/260** | 300/310 |
+| gesture-pinch | 320/331 | 327/335 | **307/307** | 319/337 |
+| paste | 576/950 | **395/807** | 358/806 | 636/1318 |
+| describe (idle) | 76/80 | 132/165 | 136/160 | 80/82 |
+| gesture-tap | 53/55 | 81/105 | 52/54 (VOID: device test "fast-inject tap navigates" FAILED again) | 53/54 |
+| tap+describe settle:false | 720/1116 (as-is) | 690/905 | 636/923 (VOID) | 532/1090 (as-is) |
+
+Screen-graph C.2 CI run (33742435496): the needle fix did NOT land — pre-flight
+still lists the same 14 PROBLEM needles and the matrix ran anyway; success
+0.60–0.70 for every config (no discrimination), O5 30/60 locateFailed, B2 2
+fallbacks. H4 remains NOT MEASURED. H1/H3 (tokens/step) are oracle-independent.
+
 ## Pending (blocked on host memory, then AVD queue C.1 → 3f → 3g)
 - 3f bench: OFF / ON-uiautomation / ON-scrcpy — tap tail and per-event
   inject cost with the scrcpy backend.
