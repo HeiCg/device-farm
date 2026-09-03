@@ -43,6 +43,20 @@ Fix the real cause; add a unit test that the tap message sequence matches
 scrcpy's own click sequence (DOWN pressure 1, buttons per pointer type, UP
 pressure 0, same pointerId).
 
+## Lead from the stopped attempt (2026-09-03)
+The agent was inspecting how `@yume-chan/scrcpy`'s `ScrcpyControlMessageWriter`
+buffers/flushes `injectTouch` messages when it was stopped. Hypothesis 0
+(check FIRST): the tap's DOWN and UP are written back-to-back into the
+same writer without an awaited flush between them, or the writer batches
+both into one write that the server's reader consumes as a single frame —
+whereas swipe/pinch interleave many MOVEs with real-clock waits so their
+DOWN is flushed long before UP. Test: await the writer/stream flush after
+DOWN, hold 50 ms on the real clock, then UP; or send one no-op MOVE at the
+same point between them. Also verify DOWN and UP carry the same
+`pointerId` and that `videoWidth/videoHeight` are non-zero if the server
+build validates them for DOWN (control-only 3.3.1 ignores them per the 3f
+review, but confirm for this event type).
+
 ## Bench hardening (required regardless of the fix)
 - `gesture-tap` and `tap+describe` in `bench-open-vs-proprietary.ts`: assert
   effect per iteration — read `getState().hash` (open) / describe text hash
