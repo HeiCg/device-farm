@@ -105,7 +105,12 @@ are ≈22 ms total → the remaining ~90 ms is host/transport (phase 3i).
 Screen-graph C.2 CI run (33742435496): the needle fix did NOT land — pre-flight
 still lists the same 14 PROBLEM needles and the matrix ran anyway; success
 0.60–0.70 for every config (no discrimination), O5 30/60 locateFailed, B2 2
-fallbacks. H4 remains NOT MEASURED. H1/H3 (tokens/step) are oracle-independent.
+fallbacks. H4 remains NOT MEASURED. Oracle-independent results from the same run
+(tokens/step p50 o200k, RTT/step): B1 473/2, B2 447/2, O1 **67**/2, O2
+**32**/2, O3 397/2, O4 **63**/1, O5 0/1 (30/60 locateFailed). H1 PASS
+(0.182×), H3 PASS (0.129×), **H2 PASS over the 30 same-screen steps (1
+RTT/step removed)**, H2 FAIL over all steps. The proprietary path has no
+O1/O2/O4 equivalent.
 
 ## Pending (blocked on host memory, then AVD queue C.1 → 3f → 3g)
 - 3f bench: OFF / ON-uiautomation / ON-scrcpy — tap tail and per-event
