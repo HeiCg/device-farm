@@ -1,3 +1,7 @@
+> SUPERSEDED. The tap and pinch "ON wins" rows below are artifacts (zero-hold tap,
+> 180 ms pinch cap) — retracted in `2026-09-02-open-vs-proprietary-results-v3.md`.
+> Current like-for-like numbers: `2026-09-02-open-vs-proprietary-results-v4.md`.
+
 # Results: argent proprietary Android backend vs open-device-server
 
 Measurement-only benchmark for the spec

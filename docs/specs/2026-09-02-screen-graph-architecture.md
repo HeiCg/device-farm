@@ -8,10 +8,10 @@ arXiv preprint tied to the argent RFC.
 
 Every LLM device agent we measured — argent's tool-per-call loop, our own DSL
 loop, and every published mobile agent we know of — re-reads the whole screen
-after every action. On Android Settings that is ~470–1080 tokens and ~75 ms of
-device serialization per step, before the model has even decided anything; the
-proprietary backend "wins" today only because it prunes that dump harder. We
-propose to stop dumping. The device-side server keeps a **versioned
+after every action. On Android Settings that is ~660 tokens (o200k) and ~15 ms
+of device serialization per step, before the model has even decided anything;
+both backends now emit the identical trimmed tree (657 = 657 tokens, Jaccard
+1.000), so pruning is exhausted as a lever. We propose to stop dumping. The device-side server keeps a **versioned
 accessibility tree** and answers **queries** (selectors, deltas, hashes) instead
 of returning the tree; the host keeps a persistent **screen graph** — screens
 fingerprinted by structure, edges labelled by the action that caused the
@@ -26,13 +26,17 @@ benchmark harness against the argent baseline.
 
 ## 1. Problem, with our numbers
 
-Measured 2026-09-02 on AVD bench-api35 (report:
-`2026-09-02-open-vs-proprietary-results.md`):
+Historical baseline, v1 run of 2026-09-02
+(`2026-09-02-open-vs-proprietary-results.md`); these figures are SUPERSEDED
+and kept only to show the starting point. Current like-for-like numbers are in
+`2026-09-02-open-vs-proprietary-results-v4.md` (v4/v6): describe token parity
+657 = 657 (o200k), 14 = 14 elements, Jaccard 1.000; tap 61 ms open vs 53 ms
+proprietary (+8 ms).
 
-| per step | argent proprietary | our open server |
+| per step (v1, superseded) | argent proprietary | our open server |
 |---|---|---|
-| describe (Settings root) | 473 tok / 14 el / 73 ms | 1077 tok / 59 el / 74 ms |
-| tap | 53 ms | 146 ms |
+| describe (Settings root) | 473 tok (chars/4) / 14 el / 73 ms | 1077 tok (chars/4) / 59 el / 74 ms — trim landed in v2, now 657 / 14 |
+| tap | 53 ms | 146 ms — injector fixes landed in v2/v3, now 61 ms |
 | auto-capture after each tool (argent MCP) | +screenshot +tree ≈ 800 tok/step | same policy when routed |
 
 Two structural facts drive the cost, independent of backend:
@@ -167,7 +171,8 @@ change — form filling, toggles, same-screen text entry, failed/no-op taps —
 and the task set extended with such steps before it can be tested; the
 navigation-heavy pass 1 could not exercise it. The task suite's needles
 must also be validated against the origin screen (Phase C.1): pass 1's
-100 % across all open configs was partly a permissive oracle, not evidence.
+100 % across all open configs may be partly a permissive oracle (query returned a
+non-empty set for a word absent from the page), not evidence.
 
 ## 5. Related work and positioning (verified survey: `2026-09-02-screen-graph-related-work.md`)
 
@@ -189,7 +194,8 @@ Claims we present as *incremental*, with the residue we defend:
   *observation*, not only action plans (Stagehand caches plans by DOM hash).
 - Actions return outcomes: Agent-E's change observation has the same loop
   shape. Residue: fingerprint-carrying outcome lets the host skip `describe`
-  entirely; RTT saving measured (H2).
+  entirely; the RTT saving is NOT yet demonstrated (H2 FAIL, 0 RTT removed on
+  the navigation-only pass 1 — see §4).
 - `H`/`H_text`: two points on Baek & Bae's multi-level GUI comparison
   criteria lattice (ASE 2016) — cite as the definition; APE (ICSE 2019)
   refines the abstraction at runtime. We claim the placement (on-device,
