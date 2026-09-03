@@ -56,7 +56,7 @@ Generated 2026-09-03T01:24:03.574Z. Harness:
 | H1 O1 tokens/step vs B2 (unchanged steps) | ≤ 0.5× | 0.107× | PASS |
 | H2 O2 removes ≥1 RTT/step vs B2 | ≥ 1 | 0 | FAIL |
 | H3 O4 tokens/step vs O3 (revisited) | ≤ 0.2× | 0.064× | PASS |
-| H4 success non-inferior (±2 pp) to B1 | ≥ base − 2pp | base 33% | PASS |
+| H4 success non-inferior (±2 pp) to B1 | ≥ base − 2pp | **NOT MEASURED** (B1 baseline invalid — see note) | INCONCLUSIVE; vs B2 (100%): all O configs 100% / O3 97.8% |
 
 ## Cold vs warm (O3 vs O4)
 
@@ -96,5 +96,5 @@ Generated 2026-09-03T01:24:03.574Z. Harness:
 - Token counts are of the exact payload the scripted agent would see per the config policy (describe / query / diff / graph-lookup summary); `none` steps cost 0.
 - O3 is the cold baseline (empty store, never reuses the graph); O4/O5 preload the graph O3 persisted. cold/warm compares O3 novel-screen describe vs O4 known-screen graph-lookup.
 - H2 counts action + observation round-trips. The open baseline (B2) already folds idle+tree into one describe RPC, and the navigation tasks change the screen every step, so O2's outcome has no unchanged step to skip against it — hence no RTT removed here. The saving materializes only on steps whose outcome reports no change.
-- B1 (argent proprietary) success is a harness artifact, not an argent deficiency: B1 locates tap targets via `uiautomator dump`, which contends with the android-devtools instrumentation's UiAutomation and often returns stale/failed dumps, so taps miss. Read H4 against B2 (100%) too — every open config matches it.
+- **B1 (argent proprietary) 33% is a harness artifact, not an argent deficiency — H4 vs B1 is retracted.** Post-hoc diagnosis of the raw JSON: (A) B1's `locateViaDump` never produced XML (the android-devtools instrumentation holds UiAutomation, the dump fails, the failure is swallowed) and `runAction` ignores `found:false`, so every B1 tap landed at screen centre — all failing Settings tasks show the identical 439-token "Connected devices" screen regardless of selector; `settings-connected` "passes" only because its assertion word happens to be on that screen. (B) The assertion oracle differs by config: B1 uses a substring scan over the rendered describe, the open configs use an on-device `query` — provably non-equivalent on the same screen (`settings-display`: same 653-token describe, B1 fails "brightness", query passes). (C) The open-path `query` oracle may over-match: it returns a non-empty set for "documentation" on example.com, a word not in the page body — so the 97.8–100% open-config success may itself be inflated. Until the harness (i) aborts on locate failure, (ii) uses one oracle for all configs, and (iii) persists the matched node text, H4 is not measurable. H1/H3 (tokens per step) do not depend on the oracle and stand.
 - Emulator torn down after the run (see harness teardown).
