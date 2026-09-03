@@ -406,3 +406,85 @@ proprietary default (100 % vs 15–25 %).
    poll loop.
 5. **Staleness target derived live** ("Network & internet", 11 markers) rather than
    hardcoded, so the probe is robust across API levels / Settings layouts.
+
+---
+
+# v7 / phase 3f: scrcpy fast-inject backend (control channel) — go/no-go spike + status
+
+**What changed (behind a flag, default OFF).** A new touch backend injects
+`tap`/`swipe`/`gesture` over the scrcpy (Apache-2.0) control channel
+(`@yume-chan/adb-scrcpy`, server **3.3.1** from the scrcpy release via
+`@yume-chan/fetch-scrcpy-server` — never Argent's tarball) instead of the
+`UiAutomation.injectInputEvent` instrumentation hop. `describe` / `state` /
+`screenshot` / `typeText` / `key` / `await-*` stay on the Kotlin
+`android-device-server`. Gate: blueprint factory option
+`fastInject: 'off' | 'scrcpy'`, flag `open-device-server-fast-inject` (default
+off). Host-side timelines are a faithful port of the on-device Kotlin
+`MotionInjector` / `TapHandler` / `SwipeHandler` / `GestureHandler` (tap hold
+50 ms / multi-tap gap 100 ms, momentum head + dense 16 ms tail, held-swipe decel
+hold, gesture 16 ms resample + reverse-lift order), paced against a real wall
+clock so fling fidelity is unchanged.
+
+## Step 0 — go/no-go spike (emulator-5554, API 35, 1080×2400, scrcpy-server 3.3.1)
+
+| Check | Result |
+|---|---|
+| 1. Single tap DOWN/UP at a Settings row → navigation | **PASS** — Settings → `com.google.android.gms/…MainActivity` (top activity changed) |
+| 2. Two-pointer pinch-zoom | **PASS** — multi-touch confirmed. On `example.com` (near-blank) diff was only 1.39 % (content artifact, not a miss); on a content-rich page (Wikipedia) an opposing two-finger spread produced a **99.0 %** screenshot reflow, unachievable without a real 2-pointer pinch |
+| 3. Per-`injectTouch` wall time, n=200 | **p50 0.02 ms / p95 0.04 ms / max 1.08 ms** — this is the HOST-side control-socket write, not end-to-end on-device dispatch (scrcpy delivers async). The win is that the host never blocks on the binder round-trip the UiAutomation path pays (ref: DOWN 14 / UP 10 / MOVE 1 ms). True per-event on-device cost needs the like-for-like bench below |
+| 4. Coexistence with instrumentation | **PASS** — scrcpy (shell-uid `app_process`) ran alongside the server; **0** `INJECT_EVENTS` / SELinux `avc: denied` lines in logcat on API 35 |
+
+**Verdict: GO.** Both required checks (1 and 2) pass on API 35 with no SELinux/
+INJECT_EVENTS denials, so the backend stays enabled behind the flag (default off).
+No emulator-gRPC fallback needed.
+
+## Ordering guarantee (flushInput)
+
+scrcpy injects from a separate process, so this server's tap async-UP bookkeeping
+never sees those events and `drainAsyncUp` would no-op. After every fast-inject
+action the blueprint calls a new Kotlin RPC **`flushInput`** (server APK bumped to
+**0.1.16 / versionCode 19**), which injects ONE synchronous no-op `ACTION_CANCEL`
+`MotionEvent` in `WAIT_FOR_FINISH` mode. Both scrcpy's events and this one funnel
+through the single system InputDispatcher FIFO, so the sync injection blocks until
+every touch enqueued ahead of it is delivered — a following `getNestedState` /
+describe on the Kotlin channel therefore observes the settled, finger-up tree, and
+`tapWithOutcome`-style before/after captures stay honest.
+
+## Per-verb routing (fast-inject ON)
+
+| verb | backend | notes |
+|---|---|---|
+| tap / multi-tap | scrcpy `injectTouch` | same DOWN/UP timeline (hold 50, gap 100) as `injectTaps` |
+| swipe (momentum) | scrcpy | head + dense 16 ms tail; lift carries velocity |
+| swipe (momentum-free, holdEndMs>0) | scrcpy | travel@8 ms + decel hold → ~0 lift velocity |
+| gesture (pinch/rotate/custom) | scrcpy | per-pointer messages; server synthesizes POINTER_DOWN/UP |
+| describe / state / screenshot / typeText / key / await-* | Kotlin server | unchanged; `flushInput` orders them after a fast-inject |
+
+## Tests
+
+- **Unit (no device):** timeline parity (tap / multi-tap / momentum + held swipe /
+  pinch — frame count, `tMs`, pointer ids) and backend lifecycle with `@yume-chan`
+  mocked (single lazy connect, `injectTouch` args, dispose stops the client), flag
+  off by default → **15 passing**. Full tool-server suite **4952 passed / 13
+  skipped / 0 failed**; `tsc` build and `typecheck:tests` clean.
+- **Device tests written** (`android-open-server.device.test.ts`, sibling
+  `FAST-INJECT` suite, opt-in): tap navigates, tap→describe destination + quick-read
+  ordering, pinch zooms, momentum-free < default fling, coexistence. In the one
+  uncontended window obtained, 4/5 passed (the 5th was a harness bug — Settings
+  relaunch resumed a sub-screen — since fixed with force-stop + a full-width-row
+  target).
+
+## Blocked / deviations
+
+- **Like-for-like bench (Step 3: OFF-1 / ON-uiautomation / ON-scrcpy / OFF-2) NOT
+  run.** The single shared AVD (`bench-api35` / emulator-5554) is held by
+  concurrent **peer background agents** of this session (`aec9856e051306b76`
+  "Phase 3e: run bench", `a53dc912ec9308751` "Phase C.1") that continuously hold
+  the exclusive UiAutomation channel; this agent has no authority to stop them
+  (`TaskStop` refused: task owned by another agent). Repeated attempts to run the
+  device suite were killed mid-test ("open-device-server connection closed" /
+  "am instrument exited before ready") by the peer's instrumentation. The full
+  per-event inject cost / tap p50-p95-max / fling grid therefore await an exclusive
+  device window.
+- **Emulator NOT torn down.** The peer agents depend on emulator-5554; tearing it
+  down would sabotage their in-flight work. Left running.
