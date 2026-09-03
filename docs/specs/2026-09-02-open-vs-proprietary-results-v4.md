@@ -655,3 +655,109 @@ describe on the Kotlin channel therefore observes the settled, finger-up tree, a
   device window.
 - **Emulator NOT torn down.** The peer agents depend on emulator-5554; tearing it
   down would sabotage their in-flight work. Left running.
+
+---
+
+# v8 / phase 3g: find the real transitional-describe residual; R1/R2/R3 correctness
+
+Branch `feat/android-open-server-p3g` (worktree `argent-p3g`), based on
+`feat/android-open-server` @ `6e871792` (phase 3f review fixes: flush folded into
+reads via `flush:true`, fastInjectFallbacks, robust scrcpy lifecycle). Local
+commit `b8d2e242`. Server APK bumped to **0.1.18 / versionCode 21** (above 3f's
+20), manifest synced, APK built offline (`aapt` confirms `versionCode='21'
+versionName='0.1.18'`).
+
+## What landed (code + tests + APK, no device)
+
+1. **Stage timings in the RPC, not logcat (Work item 1).** `getState` /
+   `getAccessibilityTree` now return
+   `timings:{idleMs, rootMs, windowsMs, rootsMs[], serializeMs, encodeMs}`.
+   `rootMs` is `uiAutomation.rootInActiveWindow`; `windowsMs` is the
+   `uiAutomation.windows` enumeration; `rootsMs[]` is each kept window's `w.root`
+   binder call; `serializeMs` the node walk; `encodeMs` the JSON encode; `idleMs`
+   mirrors `waitedMs`. Collected by a pure `WindowTimings` holder filled in
+   `NestedWindowSerializer`, threaded through the blueprint (`OpenServerTimings`),
+   the describe contract/result, and the bench.
+2. **R1 ordering (Work item 2).** New pure `AsyncUpTracker` clears the
+   outstanding-UP flag **only after** the synchronous flush returns (the 3e bug
+   cleared it first, so a thrown/dropped flush left a stale finger-down tree for
+   the next capture). `HierarchyHandler` now drains via the same shared helper
+   (`MotionInjector.drainAsyncUp`) in the non-flush path, coexisting with 3f's
+   `flush:true`. Every `injectInputEvent` return is checked; `tap`/`swipe`/
+   `gesture` surface `dropped:true` and the host throws (fails the action → falls
+   back) on a drop.
+3. **R3 clipboard (Work item 3).** `ClipboardHandler` returns `error` only when
+   the on-device write **threw** (transient); a clean `success:false` is the
+   API-level silent drop. The host cache marks a device unsupported only after
+   **two consecutive definitive falses**, never on a transient — a single Looper
+   hiccup can no longer permanently disable the genuine-clipboard paste path.
+4. **Window-filter safety (Work item 4).** A non-active `TYPE_APPLICATION` window
+   is kept when it **overlaps** the active window and is `isFocused || layer >
+   activeLayer` (AutoCompleteTextView dropdowns, overflow menus, spinner lists —
+   the next tap target); only fully-behind windows (outgoing activity, app behind
+   a dialog) are dropped. IME / system chrome kept as before.
+
+### Tests (green, offline)
+
+- **Kotlin JVM (15):** `AsyncUpTrackerTest` (flag cleared only after inject; stays
+  set on a throwing flush; flush always clears) + extended
+  `NestedWindowSerializerTest` (active/IME/system kept; fully-behind app dropped;
+  non-focusable higher-layer popup kept; focused overlapping popup kept;
+  higher-layer non-overlapping dropped; same-layer unfocused overlapping dropped).
+- **TS (vitest):** `open-server-clipboard-cache` (2-consecutive rule, transient/
+  success reset, per-device); `open-server-input-drop` (tap/swipe/gesture throw on
+  `dropped`); `open-server-window-goldens` (fixture-based render goldens: Settings
+  root, search+IME, dialog before/after with app-behind absent, two-app-windows,
+  popup suggestions present-vs-absent contrast); updated `open-server-paste` for
+  the 2-consecutive R3 rule. **Full tool-server suite: 4978 passed / 18 skipped /
+  0 failed** (`--maxWorkers=2`); `tsc --noEmit` clean.
+
+## Stage-timing table (idle vs after-tap) — PENDING (device)
+
+The bench (`bench-open-vs-proprietary.ts`) now persists `timings` per describe
+call and prints a per-stage p50/p95 table (idle vs after-tap) per block; the JSON
+carries `describeSplitIdle.stages` / `describeSplitAfterTap.stages`. Numbers below
+await an **exclusive, healthy** device window (see Blocked).
+
+| stage (open path, p50/p95 ms) | idle | after-tap |
+|---|---|---|
+| idleMs | _pending_ | _pending_ |
+| rootMs (rootInActiveWindow) | _pending_ | _pending_ |
+| windowsMs (windows enum) | _pending_ | _pending_ |
+| rootsMs (Σ w.root) | _pending_ | _pending_ |
+| serializeMs | _pending_ | _pending_ |
+| encodeMs | _pending_ | _pending_ |
+
+Hypothesis under test (from the 3e review): the ~100 ms after-tap residual sits in
+`rootInActiveWindow` / `windows` / `w.root` binder calls during the transition,
+not in serialize (p50 1 ms / p95 22 ms in 3e). If `rootMs` dominates after-tap,
+the follow-up experiment is `uiAutomation.windows.first{isActive}.root` and/or the
+`FLAG_RETRIEVE_INTERACTIVE_WINDOWS` service-info flag, re-measured.
+
+## Popup / dialog describe evidence — offline goldens PASS; device confirm PENDING
+
+The render-pipeline goldens prove the fix at the host boundary: with the popup
+window in the emitted set, the dropdown suggestions ("Wi-Fi", "Wireless
+debugging") render; dropped (3e behavior) they vanish; a dialog renders its
+buttons while the app-behind rows are absent. On-device confirmation (open an
+overflow menu + an AutoCompleteTextView dropdown + a dialog, verify items present
+in describe) is **PENDING** the device window.
+
+## tap+describe (settle:false/true), OFF-1/OFF-2 spread — PENDING (device)
+
+`tap+describe(settle:false|true)` and the OFF-1/OFF-2 baseline spread await the
+device run; the bench already emits these verbs and the stage table alongside.
+
+## Blocked / deviations
+
+- **All device measurements deferred.** A coordinator directive placed a
+  **host-healthy hold** on any AVD boot (host swap 18/19 GB, ~200 MB free — benches
+  run under it are contaminated), on top of the ticket's AVD queue (observe two
+  emulator appear/disappear cycles, or 240 min). Neither gate had cleared at
+  hand-off, so nothing was booted, `ZF524RZBHD` was never targeted, and no
+  emulator was torn down (none was started). The stage-timing table, on-device
+  popup/dialog confirmation, and tap+describe/OFF-1/OFF-2 numbers are the only
+  outstanding items; the bench + APK are staged to produce them in one run the
+  moment the host is healthy and the AVD is free.
+- All code, unit tests, goldens and the APK build were completed offline first, as
+  required.
