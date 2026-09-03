@@ -763,6 +763,146 @@ device run; the bench already emits these verbs and the stage table alongside.
   required.
 
 
+# v9 / phase 3h: scrcpy fast-inject tap LANDS — the failures were the effect oracle
+
+Branch `feat/android-open-server-p3h` (code) merged into `feat/bench-ci-3h` (CI).
+x86_64 / KVM GitHub-hosted runner, `system-images;android-34;google_apis;x86_64`,
+SwiftShader. **Only OFF vs ON within one run is like-for-like; never compare to the
+local arm64/HVF numbers in v4–v6, and never blend the runs below into one table.**
+
+## Root cause: the effect oracle read "after" too early — the injector is fine
+
+The scrcpy control-channel tap **lands**. Every failure this phase was an *effect
+oracle* judging the tap too early or with too coarse a signal, not a dropped touch.
+
+- **Bench oracle (fixed earlier today).** The bench's per-iteration effect check
+  read the screen fingerprint once, immediately after the tap, racing the
+  navigation render — so the proprietary block reported **effectZero = 16/20** even
+  though the taps had landed. Replaced with a timing-INDEPENDENT poll of the
+  describe label-set fingerprint (≤ 3 s), BACK-restore, and `originLost` accounting.
+  After the fix the ON blocks report effectZero = 0 (see the table).
+- **Device-test oracle (fixed this phase).** The on-device fast-inject tests used a
+  screenshot `pngDiffRatio > 10 %` oracle. A real Settings → sub-screen navigation
+  between two similar-looking lists differs by **well under 10 %** of pixels
+  (measured Δ ≈ 6 % for a genuine "Network & internet" navigation), so the oracle
+  read `landed = false` while the bench measured `effectZero = 0` for the SAME
+  scrcpy tap. The tap tests now mirror the bench EXACTLY: derive the target by label
+  from a fresh describe after the readiness gate, assert Settings holds window focus
+  (`dumpsys` `mCurrentFocus`, logged), tap through the scrcpy backend, then poll the
+  describe **label-set fingerprint** ≤ 3 s and assert zero scrcpy→Kotlin fallback.
+
+## Injector exonerated — scrcpy vs UiAutomation MotionEvents are byte-identical
+
+`InputReader`/`InputDispatcher` VERBOSE logcat from the device test (run
+33804707586), one UiAutomation tap and one scrcpy fast-inject tap:
+
+```
+UiAutomation (3c, @377,660):
+  MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=377.0, y[0]=660.0,
+    toolType[0]=TOOL_TYPE_FINGER, buttonState=0, ... deviceId=-1, source=0x1002, ... }
+scrcpy fast-inject (@407,860):
+  MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=407.0, y[0]=860.0,
+    toolType[0]=TOOL_TYPE_FINGER, buttonState=0, ... deviceId=-1, source=0x1002, ... }
+```
+
+Identical in every field that governs dispatch: `deviceId=-1`, `source=0x1002`
+(TOUCHSCREEN), `toolType=TOOL_TYPE_FINGER`, `buttonState=0`. Only `x`/`y`/`eventId`
+differ. The scrcpy DOWN→UP are 50 ms apart (eventTime 475461 → 475511), **two
+frames, no MOVE** — the same-point MOVE tried in an earlier spike was reverted.
+
+## Tap latency — p50 / p95 (ms), GREEN run 33812265077, N = 20
+
+| verb | OFF-1 | ON-uiautomation | ON-scrcpy | OFF-2 |
+| --- | --- | --- | --- | --- |
+| gesture-tap | 53 / 59 | 83 / 125 | **51 / 52** | 53 / 60 |
+| tap+describe | 640 / 1077 | — | — | 598 / 828 |
+| tap+describe (settle:false) | — | 477 / 727 | 494 / 806 | — |
+| tap+describe (settle:true) | — | 920 / 1196 | 914 / 1145 | — |
+
+tap verdict (gesture-tap p50): ON-scrcpy **51 ms** beats ON-uiautomation 83 ms
+(**YES**) and OFF 53 ms (**YES**).
+
+## Effect-check, timeline parity, fallbacks — per block (run 33812265077)
+
+| block | no-effect taps (effectZero / checked) | originLost | scrcpy fallbacks | tap frames | holdMs | MOVE |
+| --- | --- | --- | --- | --- | --- | --- |
+| OFF-1 | not armed (0 / 0)¹ | 0 | 0 | 2 | 50 | no |
+| ON-uiautomation | 0 / 60 | 0 | 0 | 2 | 50 | no |
+| ON-scrcpy | 0 / 59 | 0 | 0 | 2 | 50 | no |
+| OFF-2 | not armed (0 / 0)¹ | 0 | 0 | 2 | 50 | no |
+
+- effect gate (ON-fatal, OFF-tolerated): **PASS** — both ON blocks 0 no-effect taps
+  over 60 / 59 checked iterations, target = "Network & internet".
+- ¹ On this run the proprietary root did not yield a parseable nav target, so the
+  OFF effect check was not armed (tap ran on (0.5, 0.5), latency still measured) —
+  the tolerated case. In reference run 33790646124 the OFF blocks armed at 0 / 24.
+
+## `fastInjectFallbacks = 6` (run 33780713548) explained + confirmed 0
+
+That counter appeared as **6 in BOTH ON blocks** of run 33780713548 — including
+ON-uiautomation where `fastInject=false` and no scrcpy runs at all. The bench was
+matching any `"falling back"` debug line, so it counted the **describe** path's
+`[describe.android] devtools service failed, falling back to uiautomator dump` —
+the benign empty-tree retry that fires during the rapid effect-check describes on
+every ON block — not a scrcpy inject fallback. The counter now matches only the
+blueprint's `[open-server-fast-inject] scrcpy <verb> failed; falling back to the
+Kotlin …` line (`fallbackCountSince`, `bench-open-vs-proprietary.ts`). The 6 were
+describe retries; the genuine scrcpy→Kotlin inject fallback is **0** in every block
+of the green run (table above) and is also asserted per-tap in the device test.
+
+## Fling A/B (scrcpy vs uiautomation median scroll) — run 33812265077
+
+Fling parity gate (± 0.15 on informative cells, clamped cells excluded):
+**PASS** — aggregate scrcpy / uia median ratio **1.000** within ± 0.15 over 6
+informative cells. Per-cell ratios range 0.61–1.58 (contended x86/KVM jitter on
+individual cells; the aggregate is the gated figure).
+
+## Device tests — 17 / 17 (run 33812265077), the five that were red
+
+All five previously-failing on-device tests pass; the fixes were oracle/readiness,
+never a loosened numeric bound:
+
+1. **fast-inject tap navigates** — screenshot 10 % oracle → describe label-set
+   fingerprint poll ≤ 3 s; assert Settings focus + zero fallback. Lands, Δ ≈ 6 %.
+2. **fast-inject tap→describe 20/20** — was 18/20 because `fiHome` returned while
+   the launcher still held focus (`currentPackage` flips to settings early, but
+   `dumpsys mCurrentFocus` was still `NexusLauncherActivity`), so 2 taps hit the
+   launcher. `fiHome` now starts `.Settings` directly and polls until `mCurrentFocus`
+   is Settings AND the root rendered → **20/20**.
+3. **fast-inject pinch zooms** & **3f gesture-pinch** — 0 % because Chrome opens on
+   `FirstRunActivity` on this CI image and never renders the page (bench note:
+   "Chrome/example.com did not confirm content"). Added a Chrome readiness gate
+   (`ensureChromeZoomable`: clear the first-run flow, confirm a rendered zoomable
+   page). In the green run the gate cleared FRE and the visual zoom ran for real —
+   uiautomation pinch **2.9 %**, scrcpy pinch **17.5 %**; when Chrome cannot render,
+   2-pointer delivery is still enforced and the limitation recorded (not faked).
+4. **fast-inject momentum-free swipe** — screenshot pixel-diff saturates (~7 %) for
+   any full scroll and could not separate fling from held (7.03 % vs 7.09 %). Now
+   measures real scroll distance via a labelled anchor's displacement:
+   fling **810 px** > momentum-free **653 px**.
+5. **3j paste F20** — transient `typeText timed out after 10000ms` (the open-server
+   RPC wedged once; passed in 33790646124). The client destroys the socket on
+   timeout and reconnects next call, so the typeText fallback now retries once
+   (reconnect + re-focus) rather than failing the verb on one blip.
+
+The `3k getScreenSize@fling` bound was raised **50 → 200 ms** earlier today (x86/KVM
+runner jitter vs the local HVF 50 ms); kept and still catches a re-introduced idle
+gate (a fling settle is hundreds of ms to > 1 s). Unchanged this phase.
+
+## Enforcement + runs used
+
+- The device-test step stays `continue-on-error: true` (so bench diagnostics upload
+  even on a red suite) and is gated by the final `if: always()` **"Enforce
+  device-test result"** step that fails the job when `steps.devtest.outcome ==
+  'failure'`. Green run 33812265077: that step **passed** (17/17), so nothing looked
+  green with a red suite. Enforcement kept exactly as-is.
+- **Runs referenced (never blended):** 33790646124 (bench-green / device-red,
+  reference for the pre-fix device failures); 33804707586 (device-red 2/17, source
+  of the fiHome-focus diagnosis and the injector-exoneration logcat); **33812265077
+  (GREEN, N=20 — every latency / effect / fling / fallback number in the tables
+  above).** Run: <https://github.com/HeiCg/argent/actions/runs/33812265077>.
+
+
 # v10 / phase 3i: decomposing the idle open describe (measured, not attributed)
 
 Branch `feat/android-open-server-p3i` (worktree `argent-p3i`), based on
