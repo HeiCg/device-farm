@@ -50,33 +50,34 @@ No proprietary equivalent of O1/O4 was benched (B1/B2 are the only proprietary-p
 ## Retractions so far
 - v2 "open wins tap/pinch" — hold/duration artifacts (retracted in v3).
 - v6 "R2 window prune explains tap+describe gain" — prune never fired.
+- CI run 4 "scrcpy tap 51 vs 52 beats proprietary" — tap never landed (0/20 effect); retracted 2026-09-03.
 - Phase C "H4 PASS vs B1 33 %" — harness artifact (retracted).
 
-## CI (GitHub Actions ubuntu-latest, KVM, x86_64, Android 14 API 34, N=20, p50/p95 ms) — run 33736918373
+## CI (GitHub Actions ubuntu-latest, KVM, x86_64, Android 14 API 34, swiftshader, animations off, N=20, p50/p95 ms) — run 33736918373
 
 NOT comparable to the local arm64/HVF numbers above; only OFF vs ON within
-this run is like-for-like. Same hold/duration on all blocks (asserted by the
-script); tokens 657 on every block; 0 fallbacks reported by the merge.
+this run is like-for-like. Single run. Adversarial review (2026-09-03)
+findings applied below.
 
-| verb | OFF-1 | ON-uiautomation | ON-scrcpy | OFF-2 |
-|---|---|---|---|---|
-| gesture-tap | 52/53 | 78/148 | **51/52** | 52/53 |
-| gesture-swipe | 306/317 | 288/326 | **258/259** | 297/303 |
-| gesture-pinch | 346/363 | 345/395 | **307/310** | 348/357 |
-| paste | 494/1241 | 288/756 | **317/760** | 434/1109 |
-| await-screen-idle | 490/529 | 499/537 | 498/527 | 490/532 |
-| await-ui-element | 72/76 | 76/76 | 72/76 | 72/76 |
-| describe (idle) | 72/76 | 108/132 | 112/132 | 68/72 |
-| tap+describe immediate | 568/1006 | 595/661 (settle:false) | **432/810** (settle:false) | 565/1151 |
-| tap+describe settled | — | 630/1241 | 539/1260 | — |
-| cold start (3 samples) | 1126/768/774 | 434/360/436 | 562/386/358 | 782/767/729 |
+| verb | OFF-1 | ON-uiautomation | ON-scrcpy | OFF-2 | status |
+|---|---|---|---|---|---|
+| gesture-swipe | 306/317 | 288/326 | **258/259** | 297/303 | open wins (scrcpy) |
+| gesture-pinch | 346/363 | 345/395 | **307/310** | 348/357 | open wins (scrcpy) |
+| paste | 494/1241 | **288/756** | 317/760 | 434/1109 | open wins — open-server property (one typeText RPC vs clipboard + `adb shell input keyevent` spawn); ASCII-only, emoji falls back |
+| cold start median (N=3) | 774 | 360 | **386** | 767 | open wins — open-server property (backend restart → first describe; no install either side; scrcpy not included) |
+| await-screen-idle | 490/529 | 499/537 | 498/527 | 490/532 | equal |
+| await-ui-element | 72/76 | 76/76 | 72/76 | 72/76 | equal |
+| describe (idle) | 72/76 | 108/132 | 112/132 | 68/72 | **open loses**; server stages ≈ 22 ms, ~90 ms is host/transport in the open path |
+| gesture-tap | 52/53 | 78/148 | 51/52 | 52/53 | **NOT REPORTED**: ON-scrcpy tap failed its on-device effect check in the same run (0/20 navigations, zero-pixel diff; hidden by `continue-on-error`) — timed injections that did not land |
+| tap+describe | 568/1006 | 595/661 (settle:false) | 432/810 (settle:false) | 565/1151 | **NOT REPORTED** for ON-scrcpy (same reason); ON-uiautomation 595 vs OFF 565–568 ≈ equal |
+| tokens (describe) | 657 | 657 | 657 | 657 | identical |
 
-With the scrcpy backend the open path matches or beats the proprietary
-path on every gesture (tap p95 52 vs 148 for the UiAutomation path — the
-DOWN-stall tail is gone), on paste, on tap+describe, and on cold start; it
-loses only on idle describe (Kotlin serialization on x86_64), which phase
-3g-b targets (`rootInActiveWindow` residual measured at ~200 ms mid-
-transition in run 33729614337's stage table).
+Review caveats: `fastInjectFallbacks == 0` proves no exception, not
+delivery; the gesture-parity gate compares a shared constant (cannot detect
+backend timeline drift; the in-script assert is skipped under BENCH_ONLY);
+fling A/B scrcpy vs UiAutomation: 2 of 4 informative cells at 0.44× and
+0.70× (fling fidelity NOT unchanged); block JSONs missing from this run's
+artifact (dot-dir excluded; fixed later).
 
 ## Pending (blocked on host memory, then AVD queue C.1 → 3f → 3g)
 - 3f bench: OFF / ON-uiautomation / ON-scrcpy — tap tail and per-event
