@@ -156,6 +156,19 @@ Hypotheses: H1 O1 ≤ 0.5× tokens/step vs B2 on unchanged/near-unchanged
 steps. H2 O2 removes ≥1 RTT/step. H3 O4 ≤ 0.2× tokens/step vs O3 on
 revisited screens. H4 success rate non-inferior (±2 pp) to B1.
 
+Status after Phase C pass 1 (2026-09-03, `2026-09-02-screen-graph-results.md`):
+H1 PASS (0.107×: 67 vs 629 tokens/step), H3 PASS (0.064×: 40 vs 629, RTT
+2→1 on warm), H2 FAIL, H4 not measured (baseline oracle invalid, being
+fixed in Phase C.1). H2's failure is structural, not a bug: on
+navigation-only tasks every action changes the screen, so the outcome
+never reports "unchanged" and B2 already folds idle+tree into one RPC.
+H2 must be re-stated over steps where the screen legitimately does not
+change — form filling, toggles, same-screen text entry, failed/no-op taps —
+and the task set extended with such steps before it can be tested; the
+navigation-heavy pass 1 could not exercise it. The task suite's needles
+must also be validated against the origin screen (Phase C.1): pass 1's
+100 % across all open configs was partly a permissive oracle, not evidence.
+
 ## 5. Related work and positioning (verified survey: `2026-09-02-screen-graph-related-work.md`)
 
 Headline claim, and the only one with no prior found: **the observation is a
