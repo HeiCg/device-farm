@@ -18,6 +18,32 @@ service ref resolution), and `getScreenSize`/other side RPCs if any remain
 on the describe path. The proprietary path pays one HTTP call to a local
 Rust server that returns an already-trimmed XML.
 
+## Findings so far (2026-09-03, offline mapping — start here)
+- Describe is already exactly ONE RPC (`getNestedState`); no side RPCs.
+- Host socket has `setNoDelay(true)` (android-open-server-client.ts:155);
+  the Kotlin accepted socket has NO `tcpNoDelay` — quick win, set it in
+  TCPServer.kt on accept.
+- `isFlagEnabled("open-device-server")` runs on EVERY describe
+  (platforms/android/index.ts:81) and reads disk each call: project-root
+  fs walk (`findProjectRoot`, existsSync per marker) + up to 2
+  `readFileSync` (configuration-core/src/flags.ts:208, no cache). Cache per
+  process with invalidation on setFlag/unsetFlag (they are in the same
+  module) — measure first.
+- Host tree lowering is two full passes: `nestedToParsed` rebuilds an
+  XML-shaped ParsedXmlNode (open-server-tree.ts:148) and then
+  `buildDescribeTreeFromParsedRoot` re-walks it (uiautomator-parser.ts:626).
+  Candidate: a direct nested→DescribeNode lowering that reuses the trim
+  rules, verified by the byte-identical goldens
+  (test/open-server-trim-golden.test.ts, open-server-window-goldens.test.ts).
+- `timings` is built on the device; `wireBytes` needs a hook in
+  `AndroidOpenServerClient.dispatch` (raw bytes are dropped after JSON.parse).
+- There is NO shared o200k util in src; only the bench uses js-tiktoken.
+- Goldens are inline TS literals (no captured JSON fixture on disk); a
+  fixture for the micro-bench must be authored as an `OpenServerNestedElement[]`
+  literal, or captured once in CI and committed.
+- The bench `.ts` under packages/tool-server/scripts is outside every
+  tsconfig (not typechecked in CI) — add a typecheck step when touching it.
+
 ## Work
 1. **Host micro-bench (offline, no device).** `packages/tool-server/scripts/bench-describe-host.ts`:
    load a captured nested-tree JSON fixture (add one from the goldens or
