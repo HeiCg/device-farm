@@ -1269,3 +1269,60 @@ Kotlin unit goldens `NodeSerializerCompactTest` (compact drop predicates) +
 vitest suites 451 passed (describe / open-server / await / parser / host-bench),
 including the new compact-equivalence goldens. The bench captured a fresh
 `real-nested-reply.json` into the artifact.
+
+## v11 update / phase 3j item 3d shipped: redir default for emulators
+
+CI branch `feat/bench-ci-3j` (merge `64441a88`), run **33814712705** (same runner
+class, N=20). The redir transport now engages by DEFAULT on the emulator, decided
+ON DEVICE from the qemu system properties (`EmulatorDetect`) with no host env — this
+run validates the shipped path.
+
+Idle describe, all four blocks (run 33814712705, N=20):
+
+| metric | OFF-1 | ON-uiautomation | ON-scrcpy | OFF-2 |
+|---|---|---|---|---|
+| describe idle p50/p95 ms | 52/53 | 43/45 | 43/45 | 52/53 |
+| tokens | 657 | 657 | 657 | 657 |
+| transport | adb-forward | redir | redir | adb-forward |
+
+**ON idle describe is now ≤ OFF on p50 AND p95** (43/45 vs 52/53). The p95 tail that
+adb-forward left (85 ms in run 33807101442) is gone: redir removes it. Fidelity
+Jaccard OFF-1 vs ON-uia = 1.0 (17/17); OFF-1 vs OFF-2 describe drift 0 (52/53 both);
+ON-scrcpy fast-inject fallbacks = 0; `await-ui-element` ON 33/40 vs OFF 80/84.
+
+Transport is confirmed redir by the describe path's own decomposition (ON-uia idle,
+N=20): `hostRecvMs` 0.24/0.35 (was 0/40.4 on adb-forward — the gap is gone),
+`hostRttMs` 41.7/43.5 (was 43.4/84.2 p95), `ping` 0.73 ms. describe p95 (45) is below
+this run's adb-forward RPC rtt p95 (61), which is only possible if the describe RPC
+runs over redir (redir rtt p95 19.7). The transport experiment (explicit clients per
+arm) reproduces the cause once more:
+
+| arm | rttMs p50/p95 | recvMs p50/p95 | wireB |
+|---|---|---|---|
+| adb-forward (ON-uia) | 19.7/61.4 | 0/41.0 | 14965 |
+| adb-forward +pad1448 | 18.9/60.0 | 0/40.9 | 15927 |
+| redir (ON-uia) | 18.2/19.7 | 0.33/1.19 | 14965 |
+
+Serialize-once and compact A/B hold on this run (ON-uia): server handleMs legacy
+34.4 → once 21.9; compact wire 31885 → 14967 (−53%), encodeMs 15 → 6.
+
+Shipping shape (gated to emulators): the on-device server binds `0.0.0.0` only when
+`ro.kernel.qemu==1` / `ro.boot.qemu` is set (physical devices stay loopback-only;
+`ARGENT_OPEN_SERVER_BIND_ALL` is a loud CI/debug override only). The host uses
+console `redir` when the serial is `emulator-N`, the auth token file exists, and
+`redir add` + a ping succeed; otherwise it falls back to `adb forward` and logs
+which is active. `redir del` on dispose. `decideTransport` and the qemu bind
+decision are unit-tested (`open-server-transport.test.ts`, `EmulatorDetectTest`).
+
+after-tap describe (ON-uia, n=10) is unchanged in shape: captureP50 330 ms,
+dominated by the transitional `rootMs` (202) + `rootsMs` (119) binder reads while
+the post-navigation window settles — phase 3j does not touch that path.
+
+Device tests: 13/17 passed; 4 failed, ALL in the scrcpy fast-inject / multi-pointer
+gesture-injection family (tap navigates, tap→describe settle, pinch zooms,
+gesture-pinch+rotate — all pngDiff "did the screen move" assertions returning 0 on
+the headless x86_64 emulator). These are the known injection-flakiness set tracked on
+`feat/bench-ci-3h`, unrelated to phase 3j — redir is transport-transparent to
+injection, and the describe / getState / state device tests are in the 13 passed. The
+run concluded failure ONLY on the device-test gate; bench, scoreboard, fling, and
+artifacts are green. Red job, green bench, as designed.
