@@ -60,8 +60,20 @@ removed), FAIL over all steps; H3 PASS (0.037×, graph-density dependent); H4:
 no open config inferior to B1 or B2 (paired cluster bootstrap, CIs contain 0);
 O5 routing real: 55 one-step routes + 5 zero-step no-ops of 60, 0 mis-land, 0
 fallback — labelled low-power for routing (half the tasks have no known-target
-tap). Device H_id stability: UNVERIFIED (host twin only). Phase D.3 (harness
-locate exact-match, per-step navTarget) in flight.
+tap). Device H_id stability: UNVERIFIED (host twin only).
+
+D.3 (run 33976442407, `feat/screen-graph-d` @ bfce58c19, NOT yet reviewed; the
+table above stays on D.2): exact-match locate for open configs, per-step
+navTarget (0 zero-step routes), store invariants (duplicate screens / multi-
+destination edges) gated in CI, `settings-network-internet` now genuinely
+reaches the Internet screen (needle "Add network" from a capture pass). Per
+config: B1 94, B2 99, O1 99, O2 99, O3 99, O4 100, O5 97; O5 54/60 one-step
+routes, 0 mis-lands; H1 0.212×, H3 0.034×, H4 non-inferior. Caveat: B1's five
+failures are all the two-level task, and B1's locate resolver was relaxed
+(exact-then-contains) while open configs use unique-or-refuse — an asymmetric
+harness resolver, so B1's drop is not a proprietary capability claim; H4 is
+meaningful vs B2. Follow-up D.4: symmetric resolvers on both renderings, a
+Network-&-internet-unique navTarget for `settings-network`.
 
 ## Goal verdict (owner's goal: "our driver beats theirs")
 
