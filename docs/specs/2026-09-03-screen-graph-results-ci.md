@@ -199,16 +199,19 @@ are B1 `settings-network-internet` rep 2 (one live locate-fail) and O4
   33958064084 store violates it, a clean store does not) and the host `identityHash`
   golden guard.
 
-## M3 — H_id test coverage (partially closed)
+## M3 — device H_id stability: UNVERIFIED
 
 The host `identityHash` now has a golden regression guard
 (`screen-hash.test.ts`), and this doc no longer cites host H_id tests as evidence
-of DEVICE H_id stability. Still open: a Kotlin `ScreenHash.identity` unit test and
-a host/device cross-check on a captured tree. Both need Gradle-test infrastructure
-CI does not run and a captured hierarchical tree carrying a device `idHash`, which
-no artifact provides. Left as a separate infra follow-up rather than shipped
-unverifiable. Device H_id stability is instead evidenced empirically here: the
-store has one H_id per screen and 0 duplicates.
+of DEVICE H_id stability. **Device H_id stability is UNVERIFIED** — the host tests
+exercise a host twin, not the Kotlin `ScreenHash.identity` that produced this
+store. To close it, the pre-flight now CAPTURES one full nested Settings-root tree
+WITH its device `idHash`/`H`/`H_text` (one `getNestedState`) into the artifact
+fixture (`identityFixture` in `preflight-launch-screens.json`). Next iteration that
+fixture is committed and a host/device cross-check (host `identityHash(tree)` ==
+device `idHash`) plus a Kotlin `ScreenHash.identity` unit test run offline against
+it. Until then this stays "device H_id stability: unverified"; the empirical
+evidence is only that this run's store has one H_id per screen and 0 duplicates.
 
 ## Acceptance check
 
@@ -218,7 +221,7 @@ store has one H_id per screen and 0 duplicates.
 | HIGH-2 measured O5 RPCs published, modelled "2" dropped | **PASS** (7 measured RPCs/routed tap) |
 | M1 bootstrap read from JSON | **PASS** (`env.bootstrapB` = 10000) |
 | M2 out-degree reported with H3 | **PASS** (10 nodes / 19 edges / max 14 / mean 1.9) |
-| M3 device H_id test | **PARTIAL** (host golden + doc wording; Kotlin/cross-check open) |
+| M3 device H_id test | **UNVERIFIED** (host golden added; pre-flight now captures the idHash+nested-tree fixture; Kotlin test + cross-check land next iteration) |
 | M4 O5-pure labelled task-subset; H4 low-power | **PASS** (labelled) |
 | L1 UNVERIFIED gates | **PASS** (gate clean after the swipe fix) |
 | L2 infraPreAction has a setter | **PASS** (`erroredTaskRecord`) |
