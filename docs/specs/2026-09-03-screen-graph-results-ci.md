@@ -1,213 +1,185 @@
-# Results (CI): screen-graph Phase C.4 — valid H4 (live B1, pure O5, oracle-independent tokens)
+# Results (CI): screen-graph Phase D — H_id identity, selector-carrying edges, honest O5
 
-Phase C.4 answers the C.3 review's REJECT. It makes B1 a live describe+tap agent
-(no stale precomputed coordinate), splits O5 into a truthful pure-vs-mixed pair
-from structured `navigate-to` records, makes O1/O2 tokens/step independent of the
-oracle needle, moves the needle gate to the FULL launch tree, removes the
-`navTarget == assertion` asymmetry, and raises reps to 5 with a 95 % Wilson
-interval per config. H4 is now measured against a VALID B1 and both baselines.
+Phase D answers the C.4 review's REJECT (`2026-09-03-review-c4-findings.md`). It
+adds a device-side screen **identity** hash `H_id` (keeping `H`/`H_text` for
+diff/awaitChange), makes graph edges carry the acted element's selector, routes
+`navigate-to` **only when the destination `H_id` is unambiguous**, and republishes
+every success number on the **full 100-run denominator** (exclusions caused by a
+config's own action are failures — the C.4 chosen-denominator defect, review
+C4-H1/H2, is gone).
 
-Every number below is from the FINAL CI run and is labelled with its run id.
-Numbers from different runs are never blended in one table.
+Every number below is **regenerated from the run artifact JSON**
+(`bench-sg-2026-09-05T05-32-40-643Z.json`, one per record/step), not hand-typed.
+The independent recompute in this doc reproduces the harness-emitted
+`results-ci.md` in the same artifact to the digit.
 
 ## Run (HeiCg/argent, workflow `bench-open-vs-proprietary.yml`)
 
 | Purpose | Run id | URL |
 |---|---|---|
-| **Matrix (FINAL — authoritative)** | **33806639520** | https://github.com/HeiCg/argent/actions/runs/33806639520 |
+| **Matrix (FINAL — authoritative)** | **33947160117** | https://github.com/HeiCg/argent/actions/runs/33947160117 |
 
-Branches: bench tree `feat/screen-graph-c4` @ `212d7d58`; workflow
-`feat/bench-ci-c4` @ `2fb03fc7`. The screen-graph job now checks out the bench
-tree by **branch name** (not a pinned SHA), closing root cause #1 of the stuck
-C.2/C.3 runs (a stale pin that never moved to the fixed branch; review C-L3).
-7 configs × 20 tasks × **5 reps** = 100 task-runs per config.
+Branches: bench tree `feat/screen-graph-d` @ `139bec51a`; workflow
+`feat/bench-ci-d` @ `77cd4b9a`. 7 configs × 20 tasks × **5 reps** = 100 task-runs
+per config. Tokenizer: js-tiktoken `o200k_base` (primary), chars/4 (secondary).
+Run finished 2026-09-05T06:53:30Z; `skipped: {}` (no run dropped from any
+denominator).
 
-## Pre-flight gate (full tree)
+## Pre-flight gate (full tree, destination presence required)
 
-Quoted from run 33806639520 `logs/sg-preflight.log`:
+Quoted from run 33947160117 `logs/sg-preflight.log`:
 
 ```
 PROBLEM needles: 0 — none
 [preflight] GATE PASS: PROBLEM needles: 0
 ```
 
-The needle gate for a NAVIGATING task now checks the needle against the FULL
-launch tree (visible OR below-fold), not just the visible nodes. That is why the
-old `brightness` needle is gone: it lives in the Settings root's below-fold
-Display subtitle ("Dark theme, font size, brightness"), so it passed the C.3
-visible-only gate but is BAD over the full tree (review C-M1). It is replaced by
-`Brightness level` (present on the Display screen, absent as a substring from the
-whole root) for both `settings-display` and `same-display-slider`.
+The navigating-task gate checks the needle against the FULL launch tree (visible
+OR below-fold) AND requires presence on the destination dump, not only absence on
+launch (review C-M2 closed). `settings-root nodes: 133` (full tree). One task,
+`same-display-slider`, logs `ok (absent from launch; destination unreachable —
+presence NOT verified)`: its destination could not be reached during pre-flight,
+so presence is not asserted rather than falsely claimed. All other navigating
+needles read `ok (absent from launch, present on destination)`. The preflight
+fixture is committed (`preflight-launch-screens.json`, review C-M3 closed).
 
-## Per-config — success + 95 % Wilson, tokens/step, RTT (run 33806639520)
+## Per-config — success (full 100 denominator), tokens/step, RTT
 
-`success = ok / scored`; `scored` excludes plumbing/infra failures
-(Locate/Action/Oracle/Task), which are counted separately, never dropped.
-`navFb` is the STRUCTURED O5 navigate-to fallback count (known-target taps that
-fell back to locate+tap), read from the per-step records, not console text.
+`success = ok / 100` for every config. A run is a **failure** unless its oracle
+was met; a `locate-fail` that follows the config's own navigation is a failure,
+not an exclusion (`isExcludedRun` is restricted to pre-action infra identical for
+all configs, and no such run occurred this run). The **primary** interval is the
+task-cluster bootstrap (n = 20 tasks — the 5 reps of a task are correlated, review
+C4-H5); naive Wilson (n = 100) is a secondary column and reads too narrow where
+failures cluster. `fail (L/A/O/T/N)` = locate / action / oracle / task / plain
+oracle-unmet. `nsteps` counts non-launch steps (fewer for O5: its aborted
+locate-fail runs stop early).
 
-| Config | success | 95 % Wilson | scored | ok | excluded (L/A/O/T) | tok/step o200k p50 | tok/step chars/4 p50 | obs RTT ms/step p50 | RTT count/step p50 | navFb |
+| Config | success | cluster 95% (n=20) | Wilson (n=100) | fail (L/A/O/T/N) | nsteps | tok/step o200k p50 | tok/step o200k p95 | tok/step chars/4 p50 | obs RTT ms/step p50 | RTT count/step p50 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| B1 (argent proprietary) | 100 % | [96, 100] | 99/100 | 99 | 1 (1/0/0/0) | 657 | 473 | 462 | 2 | — |
-| B2 (open, no graph) | 97 % | [92, 99] | 100/100 | 97 | 0 | 627 | 447 | 91 | 2 | — |
-| O1 (+ query/diff) | 100 % | [96, 100] | 100/100 | 100 | 0 | 179 | 103 | 4 | 2 | — |
-| O2 (+ outcomes) | 98 % | [93, 99] | 100/100 | 98 | 0 | 54 | 33 | 4 | 2 | — |
-| O3 (+ graph, cold) | 98 % | [93, 99] | 99/100 | 97 | 1 (0/0/0/1) | 598 | 397 | 87 | 2 | — |
-| O4 (graph, warm) | 98 % | [93, 99] | 100/100 | 98 | 0 | 85 | 70 | 47 | 1 | — |
-| O5 (+ navigate-to) | 99 % | [94, 100] | 87/100 | 86 | 13 (13/0/0/0) | 85 | 70 | 46 | 1 | 40/42 |
+| B1 (argent proprietary) | 98 % (98/100) | [95, 100] | [93, 99] | 2 (2/0/0/0/0) | 155 | 657 | 4510 | 473 | 431 | 2 |
+| B2 (open, no graph) | 99 % (99/100) | [97, 100] | [95, 100] | 1 (0/0/0/0/1) | 155 | 627 | 4510 | 447 | 93 | 2 |
+| O1 (+ query/diff) | 98 % (98/100) | [95, 100] | [93, 99] | 2 (0/0/0/0/2) | 155 | 138 | 515 | 77 | 4 | 2 |
+| O2 (+ outcomes) | 99 % (99/100) | [97, 100] | [95, 100] | 1 (0/0/0/0/1) | 155 | 54 | 515 | 33 | 3 | 2 |
+| O3 (+ graph, cold) | 99 % (99/100) | [97, 100] | [95, 100] | 1 (0/0/0/0/1) | 155 | 598 | 4510 | 397 | 89 | 2 |
+| O4 (graph, warm) | 97 % (97/100) | [92, 100] | [92, 99] | 3 (0/0/0/0/3) | 155 | 21 | 29 | 19 | 47 | 1 |
+| O5 (+ navigate-to) | **62 % (62/100)** | **[41, 82]** | **[52, 71]** | 38 (37/0/0/0/1) | 145 | 21 | 29 | 19 | 84 | 1 |
 
-- **B1 is now valid.** It located every tap LIVE from the `describe` it paid for
-  (a plain describe+tap agent), with **0 describe/tree fallbacks** and its
-  proprietary describe token cost intact (657 o200k / 473 chars/4). Its single
-  exclusion is one genuine locate-fail (`settings-battery-then-back` rep 3), not a
-  centre tap. The C.3 headline B1 = 93.3 % was a stale-coordinate replay artifact
-  (review C-H4); that code path is deleted.
-- **O5's 13 exclusions are honest.** They are locate-fails where `navigate-to`
-  mis-routed (see O5 section) and the fallback re-locate of the tap selector then
-  failed on the wrong screen — never a blind tap. If those 13 were counted as
-  failures instead of exclusions, O5 would be 86/100 = 86 %.
+- **B1 is a valid live agent.** It located every tap LIVE from the `describe` it
+  paid for (657 o200k / 473 chars/4), `fallbacks 0` (the proprietary path ran).
+  Its two failures are genuine locate-fails (`settings-network-internet` rep 1,
+  `settings-battery-then-back` rep 0), counted as failures on the full
+  denominator — 98/100.
+- **O5 collapsed to 62/100.** All 38 failures are on the settings navigation
+  tasks: 37 locate-fails + 1 plain oracle-unmet. This is the honest cost of
+  routing only when `H_id` is unambiguous — see the O5 section. It is **inferior**
+  to both baselines (H4).
+- **O5's RTT count/step of 1 UNDERCOUNTS the known-target taps.** The JSON records
+  `rttCount: 1` on all 55 known-target taps, but each paid more: the 40 diverged
+  taps executed a `navigate-to` step (route length 1) then a fallback locate query
+  then the tap (~3 round trips); the 15 no-route taps paid a fallback locate +
+  tap (~2). The headline p50 of 1 is dominated by the 90 non-known-target steps
+  (chrome + same-screen), where O5 does spend 1 RTT. Read O5's 1 RTT/step with
+  that caveat (review C4-M4 persists in the recorded counter).
 - O2's 33 chars/4 vs B2's 447 is the ~13× token reduction; O4/O5 spend 1 RTT/step
-  vs 2 for the baselines.
+  vs 2 for the baselines on the steps that are not known-target taps.
 
-## Hypotheses (run 33806639520)
+## O5 navigate-to structure (structured records, ALL attempted known-target taps)
+
+Counted over all **55** attempted known-target taps (before any exclusion, review
+C4-H3), classified from each step's `nav` record (`{attempted, reached,
+completedSteps, totalSteps, error, fromVia}`):
+
+| Outcome | Count | `nav` signature |
+|---|---|---|
+| **routed** (reached, target present) | **0** | reached=true, misland=false |
+| **mis-landed** (reached, target absent) | **0** | reached=true, misland=true |
+| **diverged-after-tap** | **40** | reached=false, totalSteps=1, completedSteps=0 |
+| **no-route** | **15** | reached=false, totalSteps=0, error `ambiguous target: 2 screens index this selector` |
+| **fallbacks** | **55/55** | `navFallback=true` on every known-target tap |
+
+- **O5-pure coverage: 0 of 55 known-target taps ROUTED.** `fromVia` was `exact`
+  on all 55 (the live root `H_id` matched the stored node every time), so the
+  from-side localization is not the failure — the route itself is.
+- **Mis-lands: 0** — at or under the ≤ 2 acceptance bar. But **coverage 0/55 is
+  far below the ≥ 30 acceptance bar**, so O5 routing does NOT pass acceptance.
+  Per the ticket, this is reported with the store evidence and no harness
+  workaround (see the graph-store diagnosis below).
+
+| O5 row | success | tok/step o200k p50 | RTT count/step p50 | N |
+|---|---|---|---|---|
+| **O5-mixed** (all runs, the published O5) | 62/100 = 62 % · cluster [41, 82] · Wilson [52, 71] | 21 | 1 | 100 runs |
+| **O5-pure** (runs whose every known-target tap routed) | 0/0 — **no run routed every known-target tap** | — | — | 0 runs |
+
+Of the 100 O5 runs, 50 contain ≥ 1 known-target tap; because 0 taps routed, **0**
+runs qualify as pure. O5-pure carries no information this run.
+
+## Hypotheses (run 33947160117)
 
 | Hypothesis | Statistic | Target | Measured | Verdict |
 |---|---|---|---|---|
-| H1 | O1 tokens/step vs B2, o200k p50, n=155/155 | ≤ 0.5× | 179/627 = **0.285×** | PASS |
-| H2 (all steps) | B2 − O2 RTT-count/step p50, all steps | ≥ 1 | 2 − 2 = **0** | FAIL (structural) |
-| H2 (same-screen) | B2 − O2 RTT-count/step p50, same-screen (n=50) | ≥ 1 | 2 − 1 = **1** | PASS |
-| H3 | O4 warm / O3 cold tokens/step, o200k p50 | ≤ 0.2× | 77/598 = **0.129×** | PASS |
+| H1 | O1 tokens/step vs B2, o200k p50, n=155/155 | ≤ 0.5× | 138/627 = **0.220×** | **PASS** |
+| H2 (all steps) | B2 − O2 RTT-count/step p50, all steps, n=155 | ≥ 1 | 2 − 2 = **0** | **FAIL** (structural) |
+| H2 (same-screen) | B2 − O2 RTT-count/step p50, same-screen, n=50/50 | ≥ 1 | 2 − 1 = **1** | **PASS** |
+| H3 | O4 warm / O3 cold tokens/step, o200k p50, n=153/155 | ≤ 0.2× | 21/598 = **0.035×** | **PASS** |
 
-**H1 is now needle-independent.** The per-step observation selector is no longer
-the assertion needle (C.3's `bench-screen-graph.ts:1040` fed `task.assertion` on
-every non-tap step, so the ratio moved 0.182× → 0.107× between phases with
-identical tier code — review C-H5). It is now the step's own action target, or a
-per-task `query` anchor declared in the task list that is never the needle
-(`observationQuery`, unit-tested: swapping the needle leaves every step's selector
-byte-identical). O1's value rose from the needle-coupled 0.107× to the honest
-0.285×; it still PASSES ≤ 0.5×, and it no longer moves when a needle changes.
+**H2 (all-steps) is structurally 0, not a regression.** The navigation tasks
+change the screen every step, so O2's "skip the read when the outcome reports no
+change" has nothing to act on there; the saving is real only on the SAME-SCREEN
+tasks (n = 50), where an unchanged step costs O2 1 RTT vs B2's 2.
 
-**H4 — success non-inferior to each baseline, ONE oracle for every config**,
-judged over the (task, rep) pairs BOTH sides scored, with 95 % Wilson intervals
-(a config FAILS only when its interval lies entirely below the baseline's;
-overlapping intervals are *indistinguishable at N*):
+**H4 — success non-inferior to each baseline, ONE oracle for every config**, on
+the FULL 100-run denominator (exclusions-as-failures), judged by the **paired**
+task-cluster bootstrap of `Δ = config − baseline` (no shared-pair intersection —
+the C.4 intersection removed the runs O5 destroyed from the baseline too, review
+C4-H2). A config is INFERIOR when its point estimate is more than 5 pp (the noise
+floor) below the baseline. Bootstrap: 20 000 resamples over the 20 tasks.
 
-| Baseline | Baseline success + Wilson | Verdict |
+| Baseline | Baseline success (cluster / Wilson) | Paired Δ verdict (O1..O5) |
 |---|---|---|
-| B1 (100 %, 99/99) [96,100] | | **PASS — none inferior.** O1 100 %, O2 98 %, O3 98 %, O4 98 %, O5 99 % — every interval overlaps B1's; indistinguishable at N. |
-| B2 (97 %, 97/100) [92,99] | | **PASS — none inferior.** O1 100 %, O2 98 %, O3 98 %, O4 98 %, O5 99 % — every interval overlaps B2's; indistinguishable at N. |
+| B1 (98 %, 98/100) cluster [95,100] · Wilson [93,99] | | **FAIL — one O-config inferior.** O1 +0 pp [−4, +4] · O2 +1 pp [−2, +4] · O3 +1 pp [−2, +4] · O4 −1 pp [−7, +4] — all non-inferior; **O5 −36 pp [−57, −16] — INFERIOR** |
+| B2 (99 %, 99/100) cluster [97,100] · Wilson [95,100] | | **FAIL — one O-config inferior.** O1 −1 pp [−3, 0] · O2 +0 pp [−3, +3] · O3 +0 pp [−3, +3] · O4 −2 pp [−6, 0] — all non-inferior; **O5 −37 pp [−59, −17] — INFERIOR** |
 
-Reading of H4: **at N = 5 reps × 20 tasks, no open config is distinguishable in
-task success from either the proprietary (B1) or the open (B2) baseline, while
-O2/O3/O4/O5 spend an order of magnitude fewer tokens.** This is the only H4 claim
-the noise floor supports, and it now rests on a valid B1 and Wilson intervals
-rather than the C.3 ±2 pp margin that sat an order of magnitude below the noise.
+Reading of H4: **O1–O4 are indistinguishable in task success from both the
+proprietary (B1) and the open (B2) baseline while O2/O4 spend an order of
+magnitude fewer tokens; O5 is inferior to both by ~36 pp**, its CI lying entirely
+below zero. O5's `navigate-to` did not clear the bar this run.
 
-### Noise floor / two-run delta (work item F)
+### H2 detail — RTT count/step, all steps vs same-screen only
 
-The established run-to-run noise floor is the C.3 review's same-code pair
-(33779983434 ↔ 33786304637): |Δ| = **3.4–8.3 pp** per config with 3 reps. C.4's
-95 % Wilson intervals (±3–8 pp here) are consistent with that floor, which is why
-every H4 comparison lands "indistinguishable at N." A raw C.4-vs-C.3 success
-delta is NOT a clean noise measurement — the harness changed materially between
-them (B1 stale→live, O5 fallback re-locate, needle-independent tokens) — so it is
-not used as the H4 discriminator; the within-run Wilson interval is.
-
-## O5-pure vs O5-mixed, and why navigate-to routed only 2/42 (work items B, C)
-
-O5 is reported as two rows from the structured `navigate-to` records:
-
-| O5 row | success | tokens/step o200k p50 | RTT count/step p50 | N |
-|---|---|---|---|---|
-| **O5-mixed** (all scored runs) | 86/87 = 99 % [94,100] | 85 | 1 | 87 runs |
-| **O5-pure** (runs whose every known-target tap ROUTED) | 2/2 = 100 % [34,100] | 85 | 1 | 2 runs |
-
-**O5-pure coverage: 2 of 42 known-target taps routed via navigate-to** (across
-scored runs; 2 of 60 counting every attempt). Far below the ≥ 30/36 target. The
-graph store — uploaded as an artifact this run (`graph-store/com.android.settings/34.json`),
-which the C.3 runs never shipped — shows exactly why, and it is a structural
-finding, not a harness bug:
-
-1. **All Settings sub-screens collapse into ONE graph node.** The whole Settings
-   graph has 4 nodes: the root (`299378e0…`, 23 distinct resource-ids), one empty
-   transient root, the Apps screen, and a single node `2bf46d4f…` **visited 285
-   times** that stands for *every* detail screen (Network, Battery, Sound,
-   Display, Storage, Notifications, …). They share an identical structural hash
-   `H` because `ScreenHash.appendStructural` excludes text, applies the
-   **RecyclerView first-child rule** (a scrolling container is hashed as the
-   container plus only its first child's class sequence), and quantizes bounds to
-   1/32 — so `AppBar + CollapsingToolbar + RecyclerView(first row)` is identical
-   across all of them. There is therefore **no distinct destination node** to plan
-   a route to.
-2. **The single sub-screen node's text index is whatever screen was observed
-   last.** `upsertNode` overwrites the index each visit, so `2bf46d4f…` currently
-   indexes Network & internet's texts. Consequently a `navTarget` for any *other*
-   sub-screen (`Saved devices`, `Brightness`, `Battery Saver`, …) is indexed
-   nowhere → `planToSelector` returns null → **"no known path"** (settings-connected,
-   settings-display, settings-battery, … all fall through to a plain locate+tap and
-   still PASS).
-3. **When a route IS found, the edge is a coordinate/bucket tap, so it lands on an
-   arbitrary sibling.** Every recorded root→sub edge is a coordinate tap with no
-   semantic selector (the bench taps by x/y). Replaying it lands on *some* detail
-   screen, which structurally "reaches" `2bf46d4f…` (hash collision) but is the
-   wrong screen — the `navTarget` is not live-present → **mis-land**
-   (settings-network, settings-network-internet: `reached:true, misland:true` on
-   all 5 reps). The fallback then cannot re-locate the original row (we have left
-   the root) → the 13 locate-fail exclusions.
-
-The from-side fix I added (localize the live root by exact hash, else a resource-id
-multiset Jaccard ≥ 0.9) works — `fromVia` was `exact` on every O5 step this run,
-and the matcher is unit-tested against two captured roots — but it cannot rescue a
-graph that **cannot distinguish the destinations**. Fixing O5 routing needs the
-device-side hash to separate sibling list screens (e.g. include the CollapsingToolbar
-title, or hash more than the RecyclerView's first child) and the edges to carry the
-tapped row's selector, not a bucket. That is a device-server / graph change beyond
-C.4's harness scope; it is the concrete follow-up this run's uploaded graph store
-now makes actionable.
-
-## Root-hash instability — the field list (work item C)
-
-The C.3 doc blamed "the live root hash does not match … the Settings root carries
-dynamic content — clock, battery, signal." **`ScreenHash.kt` refutes that:**
-`appendStructural` hashes `className | resourceId | quantized bounds | flags` per
-node and **never appends `text` or `contentDesc`** — those go only into `H_text`
-(`appendState`). A clock tick, a battery percentage or a signal label moves
-`H_text`, never `H`. Empirically this run confirms it: `fromVia` was `exact` on
-every O5 step, i.e. the live root hash matched the stored root every time — the
-root did NOT drift.
-
-The fields that CAN move the structural hash `H` (routing must never key on
-`H_text`, and `stable(H)` should tolerate these):
-
-| Field | Source | Effect on `H` |
+| Config | RTT/step p50 (all) | RTT/step p50 (same-screen, n=50) |
 |---|---|---|
-| Quantized bounds bucket crossing | `ScreenHash.kt:66` `quant` = 1/32 of each dim (2400/32 = 75 px vertically, 1080/32 ≈ 34 px horizontally) | any layout shift past a bucket boundary changes `H` |
-| `FLAG_FOCUSED` | `ScreenHash.kt:56` `flagsOf` (bit 5) | which node holds focus is part of the screen identity |
-| RecyclerView first-child class sequence | `ScreenHash.kt:84-89` | scrolling a list changes which item is first, changing `H`; ALSO collapses sibling list screens (the O5 defect above) |
-| Node insertion/removal | DFS record sequence | a late-loading contextual card shifts the whole structural string |
-| Text / content-description | NOT in `H` (only `H_text`) | clock, battery %, signal, dates — **do not** change `H` |
+| B1 | 2 | 2 |
+| B2 | 2 | 2 |
+| O1 | 2 | 2 |
+| O2 | 2 | 1 |
+| O3 | 2 | 1 |
+| O4 | 1 | 1 |
+| O5 | 1 | 1 |
 
-`stable(H)` (implemented as `plan.ts` `localizeFrom` / `bestNodeByResourceIds`)
-sidesteps all of these by matching on the resource-id multiset when the exact hash
-misses; `isVolatileText` documents the text patterns (`\d%`, clocks, dates,
-counters) that `H` already excludes.
+## Cold vs warm (O3 vs O4)
 
-## Per-task success matrix (run 33806639520)
+- O3 cold (novel-screen) tokens/step o200k p50: **598** (n = 155)
+- O4 warm (revisited-screen) tokens/step o200k p50: **21** (n = 153)
+- warm/cold ratio: **0.035×** (≤ 0.2× target, H3 PASS)
 
-`Y` oracle met · `N` oracle unmet · `L` locate-failed (aborted, excluded).
+## Per-task success matrix (run 33947160117)
+
+`Y` oracle met · `N` oracle unmet · `L` locate-failed (aborted). `L` and `N` BOTH
+count as failures on the full denominator.
 
 | Task | B1 | B2 | O1 | O2 | O3 | O4 | O5 |
 |---|---|---|---|---|---|---|---|
-| settings-network | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | LLLLL |
-| settings-connected | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY |
-| settings-apps | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYLLL |
-| settings-notifications | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY |
-| settings-battery | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY |
-| settings-storage | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY |
-| settings-sound | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY |
-| settings-display | YYYYY | YYNYY | YYYYY | NYYNY | YNYYY | YYYNY | YYYNY |
-| settings-network-internet | YYYYY | YYYYY | YYYYY | YYYYY | YNYYY | YYYYY | LLLLL |
-| settings-battery-then-back | YYYLY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY |
+| settings-network | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY |
+| settings-connected | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | LLLLL |
+| settings-apps | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | LLLLL |
+| settings-notifications | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | LLLLL |
+| settings-battery | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | LLLLL |
+| settings-storage | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | LLLLL |
+| settings-sound | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | LLLLL |
+| settings-display | YYYYY | NYYYY | YYYNY | YYYYY | YYYYY | YYNYY | YLYLN |
+| settings-network-internet | YLYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY |
+| settings-battery-then-back | LYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | LLLLL |
 | chrome-open-page | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY |
 | chrome-heading-word | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY |
 | chrome-example-word | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY |
@@ -216,82 +188,153 @@ counters) that `H` already excludes.
 | same-settings-search | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY |
 | same-sound-noop | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY |
 | same-chrome-noop | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY |
-| same-display-slider | YYYYY | YNNYY | YYYYY | YYYYY | NYYYY | YNYYY | YYYYY |
+| same-display-slider | YYYYY | YYYYY | YYNYY | YYYNY | YYNYY | NYYNY | YYYYY |
 | same-apps-noop | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY | YYYYY |
 
-`settings-display` and `same-display-slider` stay mildly flaky across ALL configs
-(scattered single N, e.g. B2 `same-display-slider` YNNYY): the Display screen is
-reached by swipe-then-tap and the fling scroll offset is not deterministic, so a
-tap occasionally lands short. This is task reliability, not a needle or config
-issue, and it hits every config roughly equally (it does not separate them in H4).
+O5's seven `LLLLL` rows (`settings-connected`, `-apps`, `-notifications`,
+`-battery`, `-storage`, `-sound`, `-battery-then-back`) are the collapse: the tap
+selector could not be re-located after a diverged route left the source screen.
+`settings-network` and `settings-network-internet` pass because their needle
+happens to be present on the sibling screen the route lands on. `settings-display`
+and `same-display-slider` stay mildly flaky across ALL configs (the Display screen
+is reached by swipe-then-tap and the fling offset is not deterministic) — task
+reliability, not a config effect.
 
-## Oracle-independent tokens (work item D)
+## H_id — screen identity hash (device side, `ScreenHash.kt` + host twin)
 
-O1/O2 tokens/step no longer depend on the oracle needle. The per-step observation
-selector comes from `observationQuery(task, step)` (pure module
-`src/screen-graph/bench/observe.ts`): a tap/type step observes its own target; a
-swipe/back/tapXY/launch step observes the task's declared `query` anchor, else the
-first tap selector, else an app anchor — never `task.assertion`. Unit test
-`screen-graph-bench-observe.test.ts` swaps one needle and asserts every step's
-observation selector is byte-identical. The per-rep table confirms determinism:
-O1 = 179 o200k on all 5 reps, O2 = 54 on all 5.
+`H_id` is a new hash for **node keys and routing**, distinct from `H`
+(diff/awaitChange) and `H_text` (state). Design (`ScreenHash.identity` in
+`packages/android-device-server/.../ScreenHash.kt`, host twin `identityHash` in
+`packages/tool-server/src/utils/screen-hash.ts`):
 
-## navTarget de-coupled from the oracle (work item E)
+- window package;
+- the texts of **identity nodes** — collapsing-toolbar / action-bar / dialog
+  titles and a `title` under a toolbar (`isIdentityTitle`, `isToolbarContainer`),
+  with volatile text dropped (`isVolatileText`: time, %, dates, counters);
+- the **resource-id multiset of non-scrollable subtrees**, order-free (so scroll
+  and focus do not move it), system rids excluded (`statusBarBackground`,
+  `navigationBarBackground`);
+- for scrollable containers: `class#resourceId` ONLY — never the child sequence,
+  never bounds;
+- no bounds, no focus flags.
 
-`navTarget` is now a screen identity distinct from the assertion for every task
-(review C-M4 removed): settings-network routes to `Internet` while the oracle
-looks for `Calls & SMS`; settings-battery routes to `Battery Saver` vs
-`Battery usage`; etc. `validateTasks` throws if any `navTarget` or `query` equals
-its `assertion`, and a unit test asserts the shipped set complies.
+`getState`/`getNestedState` return `H_id` alongside `H`/`H_text`; the host graph
+keys nodes by `H_id`.
 
-## Superseded C.3 numbers (from run 33786304637)
+### H_id unit tests — pass
 
-The C.3 tables are withdrawn. Per-number reason:
+Run in worktree `feat/screen-graph-d` @ `139bec51a`:
 
-| C.3 number | Why superseded |
+```
+vitest run screen-graph-screen-hash.test.ts screen-hash.test.ts screen-graph-edge-selector.test.ts
+Test Files  3 passed (3)
+     Tests  30 passed (30)
+```
+
+Identity tests (`screen-graph-screen-hash.test.ts`, `describe "H_id — screen
+identity (design D §1)"` and `"H_id predicates"`):
+
+- `(a) merges the two homepage roots 77a189ce and 299378e0 into ONE H_id`
+- `(b) gives Network / Battery / Sound / Display / Apps five DISTINCT H_id`
+- `(b') the detail screens collapse under H but SEPARATE under H_id`
+- `(c) the same sub-screen scrolled keeps the SAME H_id`
+- `a sub-screen H_id differs from the homepage H_id`
+- `focus and the scroll flag never move H_id`
+- `treats collapsing_toolbar / action-bar / dialog ids as identity titles`
+- `does NOT treat a bare list title, a search hint, or homepage_title as identity`
+- `marks toolbar/app_bar containers`
+
+Edge-selector tests (`screen-graph-edge-selector.test.ts`, phase D §2/§3):
+
+- `store.observe records the selector on the edge`
+- `a later observation refreshes the selector; weight is per (from, selector)`
+- `plan carries the edge selector onto each PlanStep`
+- `keys the node/edge by the identity hash and stores H as a diagnostic`
+- `resolves by resource-id first, tapping the LIVE centre`
+- `falls through resource-id → text → contentDescription`
+- `DIVERGES when a selector was recorded but nothing resolves (edge not taken)`
+- `uses the bucket centre only when the edge carries NO selector`
+
+## Edges carry the acted element's selector (phase D §2)
+
+Every edge records the tapped node's `{text?, contentDescription?, resourceId?,
+className, indexInParent, boundsBucket}` plus outcome. Planning prefers edges with
+a selector; replay resolves it on the live tree (resource-id → text →
+contentDescription) and taps the LIVE centre; the bounds bucket is used only when
+no selector exists. An edge whose selector cannot be resolved is **not taken** (it
+diverges). Weight stays `1/(successes+1)` per `(from H_id, selector)` pair.
+
+## navigate-to correctness (phase D §3) — why O5 routed 0/55
+
+`navigate-to` now routes **only when the destination `H_id` is unambiguous** and
+verifies arrival by `H_id` equality. This is what produced the two outcomes above:
+
+- **15 no-route** — `ambiguous target: 2 screens index this selector`. The
+  destination selector resolves to two `H_id` nodes, so the router refuses rather
+  than guess. Correct, but it means no route is offered.
+- **40 diverged-after-tap** — a unique route of length 1 was planned and its edge
+  tapped, but the arrival `H_id` did not equal the target, so the route diverged
+  and fell back. The stored edges are still the C.4 bucket/coordinate edges for
+  most root→sub transitions; replaying one lands on an arbitrary sibling whose
+  `H_id` no longer collapses onto the target (H_id now SEPARATES the siblings that
+  `H` merged), so arrival verification correctly rejects it.
+
+The net effect: `H_id` fixed the **collision** (siblings are now distinct nodes,
+proven by test (b)/(b')), which in turn exposed that the **existing edges do not
+carry a resolvable selector to the right sibling** — so unambiguous routing has
+almost nothing valid to route on yet. The follow-up is to re-record the graph with
+selector-carrying edges (the machinery landed and is unit-tested) so the router
+has resolvable edges between the now-distinct `H_id` nodes; this run's store
+predates that. No harness workaround was applied.
+
+## Root-hash instability — the field list
+
+Routing keys on `H_id`, which is immune to all of these; the list documents what
+moves the **structural `H`** (so `stable(H)` / any `H`-based match must tolerate
+them). Fields and their `H_id` treatment:
+
+| Field moving `H` | Source | In `H_id`? |
+|---|---|---|
+| Quantized bounds bucket crossing | `quant` = 1/32 of each dim (`ScreenHash.kt` `quant`; host `quant`) | **No** — `H_id` carries no bounds |
+| `FLAG_FOCUSED` (bit 5) | `flagsOf` | **No** — `H_id` carries no flags |
+| Scrolling-container first-child class sequence | recycler rule (`appendStructural` / `isScrollingContainer`) | **No** — `H_id` stores `class#resourceId` only, never child sequence |
+| Node insertion/removal / DFS order | structural DFS string | **No** — `H_id` uses an order-free resource-id multiset |
+| Text / contentDescription | only in `H_text`; identity titles in `H_id` | Only identity-node titles, with volatile text dropped |
+
+## Superseded C.4 numbers (from run 33806639520)
+
+The C.4 tables in the prior version of this doc are withdrawn. Two changes drive
+every supersession: (1) this is a **new run** (33947160117); (2) phase D changed
+the accounting to the full-100 denominator and re-recorded routing under
+unambiguous-only `navigate-to`.
+
+| C.4 published number | Why superseded |
 |---|---|
-| B1 success 93.3 % | Stale-coordinate replay artifact (`precomputeB1Coords` located once, 133 s before the run, replayed for all reps; all 4 failures on the two swipe tasks). Removed; B1 now live-locates → 100 % (99/99). |
-| O5 success 82 % / "fallbacks 0" | Mixed-strategy number; the console counter missed the fallbacks (they logged via `realDebug`). navigate-to actually routed 9/153 steps, 0/9 successfully. Now split into O5-pure (2/42) and O5-mixed (99 %) from structured records; fallbacks counted structurally (navFb 40). |
-| H1 = 0.107× | Needle-coupled (observation selector was the assertion). Now needle-independent → 0.285×. |
-| H4 "O1 97 % vs B2 100 %, −3 pp ✗" | Inside the 3.4–8.3 pp noise floor; withdrawn. Replaced by Wilson-interval verdicts (all indistinguishable at N). |
-| "brightness" destination-unique | It IS in the root's full (below-fold) tree; only passed the C.3 visible-only gate. Replaced by `Brightness level`, gated over the full tree. |
-| "No route (27/36)" cause = dynamic root hash | Refuted by `ScreenHash.kt` (H excludes text). Real cause: sub-screen hash collision + bucket-tap edges (see O5 section). |
+| Per-config success on a `scored` denominator (B1 100 % of 99, O5 99 % of 87) | The denominator was chosen by the outcome (review C4-H1/H2). Phase D fixes it at 100 for every config; new values: B1 98, B2 99, O1 98, O2 99, O3 99, O4 97, O5 62. |
+| O5 success 99 % [94,100] / 86-87 | The 13 post-navigation locate-fails were excluded, not failed. Under exclusions-as-failures and unambiguous routing, O5 is **62/100 = 62 %** this run. |
+| navFb `40/42` (over scored steps) | Counted after the exclusion skip (review C4-H3). Now counted over ALL 55 attempts: 40 diverged, 15 no-route, 55/55 fallbacks. |
+| O5-pure `2/42` routed | Under unambiguous-only routing + `H_id`-verified arrival, **0/55** routed this run. |
+| navMisland `0` published as fact / mislands `10` | This run genuinely has **0 mis-lands** (arrival verification by `H_id` rejects the wrong sibling before it can count as a mis-land); the C4-H3 accounting bug is not the reason here. |
+| H4 "PASS — none inferior" | Circular for O5 (shared-pair intersection, C4-H2). Phase D's paired cluster bootstrap on the full denominator shows **O5 inferior** (−36 pp vs B1, −37 pp vs B2); O1–O4 non-inferior. |
+| H1 = 0.285× | Run-dependent; this run measures O1/B2 = 138/627 = **0.220×** (still PASS, still needle-independent). |
+| "the from-side Jaccard fix works" | `fromVia` was `exact` 55/55, so the Jaccard path never ran (review C4-M1); withdrawn again. The from-side is not O5's failure — the edges are. |
+| "the root did NOT drift" | Two root hashes for one screen (77a189ce / 299378e0) IS drift under `H` (review C4-M2). `H_id` now merges them (test (a)); the `H`-based claim is withdrawn. |
 
-## Files changed
+## Acceptance check (ticket §4)
 
-Bench tree (`feat/screen-graph-c4`):
-- `src/screen-graph/plan.ts` — `multisetJaccard`, `bestNodeByResourceIds`,
-  `localizeFrom`, `planToSelectorStable`, `nodeIndexesSelectorTolerant`,
-  `isVolatileText` (the stable/Jaccard localizer, work item C).
-- `src/screen-graph/navigate.ts` — optional tolerant `matches` predicate.
-- `src/tools/navigate-to/index.ts` — localize FROM by hash-or-Jaccard, verify
-  arrivals tolerantly, surface `fromVia`.
-- `src/screen-graph/{types,store,recorder}.ts` + `src/utils/screen-graph-open-wiring.ts`
-  — persist the resource-id multiset; index content-descriptions.
-- `src/screen-graph/bench/tasks.ts` — needle `brightness`→`Brightness level`;
-  navTargets distinct from the oracle; `query` anchors; validation.
-- `src/screen-graph/bench/observe.ts` (new) — needle-independent `observationQuery`.
-- `src/screen-graph/bench/describe-locate.ts` (new) — B1's live describe+tap locate.
-- `src/screen-graph/bench/oracle.ts` — `ignoreVisibility` (full-tree gate).
-- `scripts/bench-preflight.ts` — full-tree gate for navigating tasks.
-- `scripts/bench-screen-graph.ts` — remove precompute; B1 live-locate; structured
-  O5 nav records + fallback ordering + O5-pure/mixed; Wilson intervals; upload the
-  graph store; per-step hash + strategy + nav records.
-- Tests: `screen-graph-plan.test.ts` (matcher, two roots), `screen-graph-bench-observe.test.ts`
-  (needle-independence + describe-locate), `screen-graph-navigate.test.ts`
-  (tolerant matches), `screen-graph-bench-tasks.test.ts` (navTarget/query invariants).
+| Criterion | Status |
+|---|---|
+| O5-pure covers ≥ 30 known-target taps | **FAIL — 0/55 routed** (store evidence above; reported, no workaround) |
+| mis-land count reported and ≤ 2 | **PASS — 0 mis-lands** |
+| O5 success within the cluster-bootstrap interval of B1 | **FAIL — O5 62 % [41,82] vs B1 98 % [95,100]; −36 pp, CI entirely below 0** |
+| results doc regenerated from JSON | **PASS** (this doc; reproduces the artifact `results-ci.md`) |
+| H1–H4 restated with corrected accounting | **PASS** (H1/H2/H3 PASS/FAIL/PASS; H4 O1–O4 non-inferior, O5 inferior) |
+| `H_id` unit tests pass | **PASS** (30/30) |
+| branches pushed; run URL in the report | **PASS** (`feat/screen-graph-d` @ 139bec51a, `feat/bench-ci-d` @ 77cd4b9a; run 33947160117) |
 
-Workflow tree (`feat/bench-ci-c4`):
-- `.github/workflows/bench-open-vs-proprietary.yml` — check out the bench tree by
-  branch name; `BENCH_REPS=5`; screen-graph job timeout 120→180 min.
-
-## Acceptance check
-
-- B1 live-locates every step; no precompute code path left. ✓
-- O5 rows split; fallbacks from structured records; navigate ok/error persisted in
-  the JSON and the graph store uploaded. ✓
-- Root-hash instability fields listed (ScreenHash-grounded); matcher unit-tested;
-  O5-pure coverage reported (2/42) with the structural reason it is below 30/36. ✓
-- Tokens/step for O1/O2 shown needle-independent (unit test swaps a needle). ✓
-- Run green; `PROBLEM needles: 0` over the full tree; results doc written; branches
-  pushed; run URL above. ✓
+O5 routing did not reach acceptance. Per the ticket, the store evidence is
+reported and no harness workaround was applied: `H_id` correctly separated the
+siblings `H` had collapsed, which exposed that the existing bucket/coordinate
+edges cannot resolve to the right sibling under unambiguous-only routing. The
+selector-carrying-edge machinery is landed and unit-tested; a re-recorded graph is
+the concrete next step.
