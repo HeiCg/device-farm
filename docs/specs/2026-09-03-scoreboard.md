@@ -1,4 +1,89 @@
-# Scoreboard — open driver vs argent proprietary (as of 2026-09-03, pre-3f/3g/C.1 benches)
+# Scoreboard — open driver vs argent proprietary
+
+## FINAL (2026-09-05) — consolidated CI run 33975063607, adversarially reviewed
+
+Source: `2026-09-03-open-vs-proprietary-results-final-ci.md` (run 7,
+`feat/bench-ci-final` @ f76f5d245, code `feat/android-open-server-final`),
+review `2026-09-03-review-final-findings.md` (ACCEPT-WITH-CAVEATS). Environment:
+GitHub Actions ubuntu-latest, KVM, x86_64, Android 14 API 34, animations off,
+N=20 per verb per block, blocks OFF-1 → ON-uiautomation → ON-scrcpy → OFF-2.
+Only OFF vs ON within this run is like-for-like. Gates in force: device tests
+17/17 enforced (fail-at-end), per-block oracle self-test, first-attempt landing
+≥ 95 % symmetric, redir transport required on ON, no degraded block, zero
+fast-inject fallbacks, timeline parity (2-frame tap, hold 50 ms, no MOVE).
+Effect oracle = resumed activity (backend-independent), polled ≤ 3 s outside
+the timed window; per-iteration untimed locate through the block's own backend
+describe (`uiautomator dump` unusable on this emulator; OFF's locate is the
+slower one, so the asymmetry works against ON). Compact payload (3j) DISABLED
+(not output-preserving, review-3j). Transport on ON blocks: `redir` decided on
+device via `ro.kernel.qemu`.
+
+| verb, p50/p95 ms | OFF-1 | ON-uiautomation | ON-scrcpy | OFF-2 | drift floor (OFF-1 vs OFF-2 p50) | verdict |
+|---|---|---|---|---|---|---|
+| describe (idle) | 52/53 | 39/56 | 36/53 | 52/56 | 0 | open never slower in 3 same-code runs (run 5: 32/33 vs 52; run 6: 53/50 vs 52; run 7: 39/36 vs 52); 13–19 ms faster in 2 of 3; **magnitude not reproducible**; 3i target ON ≤ OFF+10 met in all three |
+| gesture-tap (tap RPC only) | 52/54 | 77/91 | 51/52 | 52/53 | 0 | scrcpy **at parity** (−1 ms does not clear the floor); UiAutomation +25 slower. Row not like-for-like across ON variants: the flushInput drain is inline on UiAutomation/proprietary, deferred on scrcpy |
+| tap+describe (headline like-for-like tap; ON settle:false) | 305/817 | 455/673 | 298/810 (n=19) | 313/958 | 8 | scrcpy at parity (−7…−15, at the floor); UiAutomation +142…+150 slower |
+| gesture-swipe (250 ms) | 290/308 | 296/359 | 257/262 | 294/303 | 4 | **open wins (scrcpy −33…−37)**; UiAutomation equal |
+| gesture-pinch | 338/349 | 337/358 | 307/309 | 344/362 | 6 | **open wins (scrcpy −31…−37)**; UiAutomation equal |
+| await-screen-idle | 498/504 | 463/472 | 461/474 | 497/541 | 1 | **open wins (−35)** both ON variants |
+| await-ui-element | 72/76 | 32/38 | 31/36 | 73/77 | 1 | **open wins (−41)**, strongest ON win |
+| paste | 463/1217 | 327/892 | 289/867 | 573/1104 | 110 | directional only (−174…−284 clears a 110 ms floor barely) |
+| first-attempt tap landing (landed/checked) | 40/40 | 60/60 | 59/60 (98.3 %) | 40/40 | — | real scrcpy async drop ≈1.7 % (1/60 in runs 6 and 7); undiagnosed per iteration (no per-miss log yet) |
+| tokens (describe, o200k) | 657 | 657 | 657 | 657 | — | identical; fidelity Jaccard 1.0 |
+| fling fidelity (scroll distance ratio vs proprietary, 400 ms cells) | ref | ~1.0 | 0.64–0.66 (400/0.3), 0.57–0.58 (400/0.5) | ref | stable across runs 5 and 7 | **open loses**: scrcpy under-scrolls 35–42 % at long durations (inferred: host paces one injectTouch per frame, 26 frames at 400 ms). Fling parity gate red — the only red in run 7. Ticket 3k |
+
+Superseded within the same code line: run 5 (33963464784, fling single-sample)
+and run 6 (33969204089, strict landing gate) — per-block tables in the results
+doc. Void in run 7: `destinationVisible` probe read 0/20 in all four blocks
+(stale coordinate), so phase-3d staleness is unsupported here; the screen-graph
+job was skipped in this run (its numbers come from the run below).
+
+## FINAL — screen-graph (tokens per agent step), run 33964414774 on `feat/screen-graph-d`, reviewed
+
+Source: `2026-09-03-screen-graph-results-ci.md` (D.2), reviews `…review-d1…`,
+`…review-d2-findings.md` (ACCEPT-WITH-CAVEATS). 7 configs × 20 tasks × 5 reps,
+one oracle for every config, exclusions caused by a config's own action count as
+failures, launch step excluded from tokens (n=155 steps/config), o200k p50.
+
+| config | success (N=100) | cluster-bootstrap 95 % (n=20 tasks) | tokens/step p50 | RTT/step |
+|---|---|---|---|---|
+| B1 proprietary describe + tap | 98 | [94,100] | 657 | 2 |
+| B2 open full describe | 99 | [97,100] | 627 | 2 |
+| O1 open + query/diff | 99 | [97,100] | 179 (mean-ratio 0.220×; p50 bimodal) | 2 |
+| O2 open + compact tier | 100 | [97,100] | 54 | 2 |
+| O3 open + graph, graph-blind | 100 | [97,100] | 598 | 2 |
+| O4 open + graph, warm | 99 | [95,100] | 22 (tracks graph out-degree; ≤6-affordance summary) | 1 |
+| O5 open + navigate-to | 99 | [97,100] | 28 | measured ≥ 7 RPCs per routed tap (lower bound) |
+
+H1 PASS (O1/B2 0.285× p50, 0.220× mean); H2 PASS on same-screen steps (1 RTT
+removed), FAIL over all steps; H3 PASS (0.037×, graph-density dependent); H4:
+no open config inferior to B1 or B2 (paired cluster bootstrap, CIs contain 0);
+O5 routing real: 55 one-step routes + 5 zero-step no-ops of 60, 0 mis-land, 0
+fallback — labelled low-power for routing (half the tasks have no known-target
+tap). Device H_id stability: UNVERIFIED (host twin only). Phase D.3 (harness
+locate exact-match, per-step navTarget) in flight.
+
+## Goal verdict (owner's goal: "our driver beats theirs")
+
+Wins (review-accepted, same run): swipe, pinch, await-screen-idle,
+await-ui-element (scrcpy or both ON variants); describe idle never slower and
+faster in 2 of 3 runs; tokens per agent step 3–30× lower with equal task
+success. Parity: tap RPC, tap+describe (scrcpy). Loss: scrcpy fling momentum at
+long durations (reproducible), UiAutomation tap +25 ms. Not measured on this
+line: physical devices; local arm64 numbers (older sections below) predate the
+gates and are not comparable.
+
+## Retractions added 2026-09-05
+- 3h "DOWN-MOVE-UP fixes the scrcpy tap" — the bench oracle was the bug; MOVE reverted and now forbidden by the parity gate.
+- "open describe faster, 36/53 vs 52/56" as a magnitude — not reproducible across runs 5/6/7 (direction only).
+- "ON-scrcpy beats OFF on tap" — at parity (0 ms drift floor).
+- "fling failure is measurement noise" — refuted; stable 400 ms deficit vs the proprietary reference.
+- 3j "compact payload byte-identical" — three counterexamples (scroll clip, systemui subtree, `[password]` label); disabled.
+- C.3 B1 93.3 % (precomputed coordinates) and C.4 "O5 99 %" (13 own-action exclusions) — superseded by D.2 accounting.
+
+---
+
+# History — 2026-09-03 scoreboard (pre-consolidation; kept for provenance)
 
 Source of truth: `2026-09-02-open-vs-proprietary-results-v4.md` (v4, v5, v6,
 v7 sections), `2026-09-02-open-vs-proprietary-results-v3.md` (fling
